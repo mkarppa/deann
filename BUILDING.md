@@ -81,6 +81,7 @@ If you did not install Catch2, you should see the following notice:
 ```
 The notice should not appear if you installed Catch2 correctly and
 want to build unit tests (completely optional).
+
 5. Run Make
 ```
 $ make
@@ -90,6 +91,7 @@ You should get a Python module library file, such as
 on your system).
 
  Also, if you installed Catch2, you should get a binary called `KdeTests`.
+
 6. If you built the unit tests, now would be a good time to check that
    the C++ interface works correctly by running `KdeTests` (completely
    optional).
@@ -102,6 +104,7 @@ on your system).
    ===============================================================================
    All tests passed (1162893545 assertions in 88 test cases)
    ```
+   
 7. Check that you can load the Python module in Python (optional):
    ```
    $ python3
@@ -110,6 +113,7 @@ on your system).
    DEANN Python Bindings
    ```
 If you get the same output and no errors, the module should be ready.
+
 8. Verify that the Python unit tests pass (optional):
    ```
    $ pytest test.py
@@ -128,6 +132,7 @@ If you get the same output and no errors, the module should be ready.
 
    ======================== 14 passed in 137.58s (0:02:17) ========================
     ```
+
 9. If you want to also build docs and have installed the required
 dependencies:
 ```
@@ -145,7 +150,7 @@ correctly such that the libraries and binaries can be found.
 
 1. Install dependencies if not installed
 ```
-$ sudo apt install cmake build-essentials
+$ sudo apt install cmake build-essential
 $ conda install pybind11 mkl mkl-include
 ```
 
@@ -232,10 +237,18 @@ collected 14 items
 
 test.py ..............                                                   [100%]
 
-======================== 14 passed in 310.62s (0:05:10) ========================    ```
+======================== 14 passed in 310.62s (0:05:10) ========================    
+```
 9. If you want to also build docs and have installed the required
 dependencies:
 ```
 $ make doc
 ```
 The docs will be built under `doc/`.
+
+## Installation the Python Module 
+
+After completing the build step, the Python module can be installed using 
+```
+$ make install
+```
