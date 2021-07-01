@@ -1,6 +1,7 @@
 if (Catch2_FOUND)
   add_executable(KdeTests KdeTests.cpp)
   target_link_libraries(KdeTests Catch2::Catch2 ${MKL_LIBRARIES})
+  target_include_directories(KdeTests PRIVATE ${PROJECT_SOURCE_DIR}/src)
 else()
   message(STATUS "Catch2 not found. Not building unit tests.")
 endif()

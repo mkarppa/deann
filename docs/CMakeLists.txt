@@ -2,7 +2,7 @@ add_custom_target(doc DEPENDS ${CMAKE_BINARY_DIR}/Doxyfile deann)
 
 if(DOXYGEN_FOUND)
   file(READ ${PROJECT_SOURCE_DIR}/docs/Doxyfile doxyfilevar)
-  string(REGEX REPLACE "INPUT                  =" "INPUT                  = ${PROJECT_SOURCE_DIR}/docs/" doxyfilevarreplaced ${doxyfilevar})
+  string(REGEX REPLACE "INPUT                  =" "INPUT                  = ${PROJECT_SOURCE_DIR}/src/" doxyfilevarreplaced ${doxyfilevar})
   file(WRITE ${CMAKE_BINARY_DIR}/Doxyfile ${doxyfilevarreplaced})
   add_custom_command(TARGET doc
     POST_BUILD
@@ -16,5 +16,5 @@ if (SPHINX_FOUND)
   add_custom_command(TARGET doc
     POST_BUILD
     COMMAND
-    ${SPHINX_EXECUTABLE} -b html ${CMAKE_BINARY_DIR} ${CMAKE_BINARY_DIR}/doc/deann)
+    ${SPHINX_EXECUTABLE} -b html ${CMAKE_BINARY_DIR} ${CMAKE_BINARY_DIR}/docs/doc/deann)
 endif()

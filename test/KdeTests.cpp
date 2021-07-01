@@ -1,4 +1,4 @@
-#include "deann.hpp"
+#include <deann.hpp>
 
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch.hpp>
