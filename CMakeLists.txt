@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(deann LANGUAGES CXX)
 
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -8,8 +10,6 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic-errors")
@@ -65,54 +65,7 @@ endif()
 # if you don't know why you should enable it, please ignore it
 # add_compile_definitions(DEANN_ENABLE_DEBUG_ACCESSORS)
 
-pybind11_add_module(deann deann.cpp)
-target_link_libraries(deann PRIVATE ${MKL_LIBRARIES})
+add_subdirectory(docs)
+add_subdirectory(src)
+add_subdirectory(test)
 
-if (Catch2_FOUND)
-  add_executable(KdeTests KdeTests.cpp)
-  target_link_libraries(KdeTests Catch2::Catch2 ${MKL_LIBRARIES})
-else()
-  message(STATUS "Catch2 not found. Not building unit tests.")
-endif()
-
-add_custom_target(testpy ALL DEPENDS ${PROJECT_SOURCE_DIR}/test.py)
-add_custom_command(TARGET testpy
-  POST_BUILD 
-  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/test.py ${CMAKE_BINARY_DIR}/test.py
-)
-add_custom_command(TARGET testpy
-  POST_BUILD 
-  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/extern/base.py ${CMAKE_BINARY_DIR}/extern/base.py
-)
-add_custom_command(TARGET testpy
-  POST_BUILD 
-  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/extern/faiss.py ${CMAKE_BINARY_DIR}/extern/faiss.py
-)
-add_custom_command(TARGET testpy
-  POST_BUILD 
-  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/extern/annoy.py ${CMAKE_BINARY_DIR}/extern/annoy.py
-)
-add_custom_command(TARGET testpy
-  POST_BUILD 
-  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/extern/brute.py ${CMAKE_BINARY_DIR}/extern/brute.py
-)
-add_custom_target(doc DEPENDS ${CMAKE_BINARY_DIR}/Doxyfile deann)
-
-if(DOXYGEN_FOUND)
-  file(READ ${PROJECT_SOURCE_DIR}/Doxyfile doxyfilevar)
-  string(REGEX REPLACE "INPUT                  =" "INPUT                  = ${PROJECT_SOURCE_DIR}" doxyfilevarreplaced ${doxyfilevar})
-  file(WRITE ${CMAKE_BINARY_DIR}/Doxyfile ${doxyfilevarreplaced})
-  add_custom_command(TARGET doc
-    POST_BUILD
-    COMMAND
-    Doxygen::doxygen ${CMAKE_BINARY_DIR}/Doxyfile
-    )
-endif()
-
-if (SPHINX_FOUND)
-  file(COPY ${PROJECT_SOURCE_DIR}/conf.py ${PROJECT_SOURCE_DIR}/index.rst ${PROJECT_SOURCE_DIR}/deann.rst DESTINATION ${CMAKE_BINARY_DIR})
-  add_custom_command(TARGET doc
-    POST_BUILD
-    COMMAND
-    ${SPHINX_EXECUTABLE} -b html ${CMAKE_BINARY_DIR} ${CMAKE_BINARY_DIR}/doc/deann)
-endif()
