@@ -27,6 +27,7 @@ import deann
 
 Let us start by loading the data vectors, and computing the exact KDE values.
 Make sure that the shuttle dataset is available in the root of the directory.
+This example is available in `examples/naive.py`.
 ```python
 import deann
 import numpy as np
@@ -343,6 +344,8 @@ Expected output:
 2281.074
 0.03048566726481921
 ```
+
+This example is available in `examples/faissivf.py`.
 
 Compared to the linear scan with random sampling with the same values, we are looking at far fewer points (1000 through random sampling, ~1281 on average for finding the 100-ANN). The relative error is only slightly higher. 
 
