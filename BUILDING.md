@@ -138,7 +138,7 @@ dependencies:
 ```
 $ make doc
 ```
-The docs will be built under `doc/`.
+The docs will be built under `docs/doc/`.
 
 ## Building the Python module for GNU/Linux
 
