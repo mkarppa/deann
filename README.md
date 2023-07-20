@@ -26,8 +26,26 @@ See the tutorial on a [separate page](TUTORIAL.md).
 
 ## Reference
 
+The paper is freely available <https://arxiv.org/abs/2107.02736>.
+
 If you use this library in academic work, please cite the following paper:
-* (arXiv link will be posted here once it's out)
+
+```
+@inproceedings{DBLP:conf/aistats/Karppa0P22,
+  author       = {Matti Karppa and
+                  Martin Aum{\"{u}}ller and
+                  Rasmus Pagh},
+  title        = {{DEANN:} Speeding up Kernel-Density Estimation using Approximate Nearest
+                  Neighbor Search},
+  booktitle    = {{AISTATS}},
+  series       = {Proceedings of Machine Learning Research},
+  volume       = {151},
+  pages        = {3108--3137},
+  publisher    = {{PMLR}},
+  year         = {2022}
+}
+```
+
 
 ## License
 
