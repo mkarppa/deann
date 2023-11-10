@@ -1,14 +1,22 @@
 #include <deann.hpp>
+#include "FastRNG.hpp"
 
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch.hpp>
 
+#include <unordered_set>
+
 // enable this define to print some timing information about different
 // implementations
-// #define DEANN_TESTS_DEBUG_PRINT_TIMES
+#define DEANN_TESTS_DEBUG_PRINT_TIMES
+
+// these tests take a very long time and require a very large amount of RAM, so
+// they are disabled by default
+#define DEANN_TESTS_VERYBIG
 
 using namespace deann;
 using namespace Catch::literals;
+using Catch::Matchers::WithinRel;
 using std::string;
 using std::mt19937;
 using std::vector;
@@ -22,6 +30,8 @@ using std::set;
 using std::unordered_set;
 using std::invalid_argument;
 using std::nullopt;
+using std::unordered_map;
+using std::make_pair;
 
 
 
@@ -132,12 +142,12 @@ static string parseDuration(std::chrono::nanoseconds dur) {
 
 
 template<typename T>
-static void constructMediumTestSet(T** X, int* np, int* dp) {
+static void constructMediumTestSet(T** X, int_t* np, int_t* dp) {
   mt19937 rng(0);
-  const int n = 4347;
-  const int d = 9;
-  const int nc1 = 3738;
-  const int nc2 = 609;
+  const int_t n = 4347;
+  const int_t d = 9;
+  const int_t nc1 = 3738;
+  const int_t nc2 = 609;
   static_assert(n == nc1+nc2);
 
   T mu1[d] = { 46.493792808219176, -0.4696329195205479, 85.95759310787672,
@@ -207,25 +217,25 @@ static void constructMediumTestSet(T** X, int* np, int* dp) {
   *X = allocator.allocate<T>(n*d);
   *np = n;
   *dp = d;
-  vector<int> indices(n);
-  for (int i = 0; i < n; ++i)
+  vector<int_t> indices(n);
+  for (int_t i = 0; i < n; ++i)
     indices[i] = i;
   std::shuffle(indices.begin(), indices.end(), rng);
   
   normal_distribution<double> dist;
   T z[d];
-  for (int j = 0; j < nc1; ++j) {
-    for (int i = 0; i < d; ++i)
+  for (int_t j = 0; j < nc1; ++j) {
+    for (int_t i = 0; i < d; ++i)
       z[i] = dist(rng);
-    int idx = indices[j];
+    int_t idx = indices[j];
     T* x = *X + d*idx;
     array::matmulT(d,1,d,A1,z,x);
     array::add(d,x,mu1);
   }
-  for (int j = nc1; j < n; ++j) {
-    for (int i = 0; i < d; ++i)
+  for (int_t j = nc1; j < n; ++j) {
+    for (int_t i = 0; i < d; ++i)
       z[i] = dist(rng);
-    int idx = indices[j];
+    int_t idx = indices[j];
     T* x = *X + d*idx;
     array::matmulT(d,1,d,A2,z,x);
     array::add(d,x,mu2);
@@ -897,11 +907,11 @@ TEST_CASE( "test_rowwise_sum", "[array]" ) {
   const int d = 100;
   mt19937 rng(0);
   normal_distribution<double> dist;
-  float x1[n*d];
-  float y1[n];
+  std::vector<float> x1(n*d);
+  std::vector<float> y1(n);
   for (int i = 0; i < n*d; ++i)
     x1[i] = dist(rng);
-  array::rowwiseSum(n,d,x1,y1);
+  array::rowwiseSum(n,d,&x1[0],&y1[0]);
   for (int i = 0; i < n; ++i) {
     float c = 0.0;
     for (int j = 0; j < d; ++j)
@@ -909,11 +919,11 @@ TEST_CASE( "test_rowwise_sum", "[array]" ) {
     REQUIRE(c == y1[i]);
   }  
 
-  double x2[n*d];
-  double y2[n];
+  std::vector<double> x2(n*d);
+  std::vector<double> y2(n);
   for (int i = 0; i < n*d; ++i)
     x2[i] = dist(rng);
-  array::rowwiseSum(n,d,x2,y2);
+  array::rowwiseSum(n,d,&x2[0],&y2[0]);
   for (int i = 0; i < n; ++i) {
     double c = 0.0;
     for (int j = 0; j < d; ++j)
@@ -969,7 +979,7 @@ TEST_CASE( "test_mean", "[array]" ) {
   mt19937 rng(212121);
   normal_distribution<double> dist;
   float x1[n];
-  for (int k = 0; k < nRepeats; ++k) {
+  for (int_t k = 0; k < nRepeats; ++k) {
     for (int i = 0; i < n; ++i)
       x1[i] = dist(rng);
     float m = 0;
@@ -981,7 +991,7 @@ TEST_CASE( "test_mean", "[array]" ) {
 
 
   double x2[n];
-  for (int k = 0; k < nRepeats; ++k) {
+  for (int_t k = 0; k < nRepeats; ++k) {
     for (int i = 0; i < n; ++i)
       x2[i] = dist(rng);
     double m = 0;
@@ -2007,14 +2017,14 @@ TEST_CASE( "test_rowwise_mean", "[array]" ) {
 
 TEST_CASE( "test_compute_dists1", "[array]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
 
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2041,7 +2051,7 @@ TEST_CASE( "test_compute_dists1", "[array]" ) {
 	float dist = 0;
 	uint32_t idx = indices[i*samples+j];
 	float* x = X + idx*d;
-	for (int k = 0; k < d; ++k) {
+	for (int_t k = 0; k < d; ++k) {
 	  float diff = q[k] - x[k];
 	  switch(M) {
 	  case Metric::EUCLIDEAN:
@@ -2113,14 +2123,14 @@ TEST_CASE( "test_compute_dists1", "[array]" ) {
 
 TEST_CASE( "test_compute_dists2", "[array]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
 
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2147,7 +2157,7 @@ TEST_CASE( "test_compute_dists2", "[array]" ) {
 	double dist = 0;
 	uint32_t idx = indices[i*samples+j];
 	double* x = X + idx*d;
-	for (int k = 0; k < d; ++k) {
+	for (int_t k = 0; k < d; ++k) {
 	  double diff = q[k] - x[k];
 	  switch(M) {
 	  case Metric::EUCLIDEAN:
@@ -2219,14 +2229,14 @@ TEST_CASE( "test_compute_dists2", "[array]" ) {
 
 TEST_CASE( "test_kde_euclidean_simple1", "[naivekde]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
   float scratch[9];
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2243,7 +2253,7 @@ TEST_CASE( "test_kde_euclidean_simple1", "[naivekde]" ) {
     for (int j = 0; j < nX; ++j) {
       float* x = X + j*d;
       float dist = 0;
-      for (int k = 0; k < d; ++k) {
+      for (int_t k = 0; k < d; ++k) {
 	float tmp = x[k] - q[k];
 	dist += tmp*tmp;
       }
@@ -2282,7 +2292,7 @@ TEST_CASE( "test_kde_euclidean_simple1", "[naivekde]" ) {
 
 TEST_CASE( "test_kde_euclidean_simple2", "[naivekde]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
@@ -2291,7 +2301,7 @@ TEST_CASE( "test_kde_euclidean_simple2", "[naivekde]" ) {
   double scratch[9];
   
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2308,7 +2318,7 @@ TEST_CASE( "test_kde_euclidean_simple2", "[naivekde]" ) {
     for (int j = 0; j < nY; ++j) {
       double* y = Y + j*d;
       double dist = 0;
-      for (int k = 0; k < d; ++k) {
+      for (int_t k = 0; k < d; ++k) {
 	double tmp = y[k] - q[k];
 	dist += tmp*tmp;
       }
@@ -2346,13 +2356,13 @@ TEST_CASE( "test_kde_euclidean_simple2", "[naivekde]" ) {
 
 TEST_CASE( "test_kde_euclidean_simple3", "[naivekde]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2402,7 +2412,7 @@ TEST_CASE( "test_kde_euclidean_simple3", "[naivekde]" ) {
 
 TEST_CASE( "test_kde_euclidean_simple4", "[naivekde]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
@@ -2411,7 +2421,7 @@ TEST_CASE( "test_kde_euclidean_simple4", "[naivekde]" ) {
   double scratch[9];
   
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2460,14 +2470,14 @@ TEST_CASE( "test_kde_euclidean_simple4", "[naivekde]" ) {
 
 TEST_CASE( "test_kde_euclidean_matmul1", "[naivekde]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
 
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2521,14 +2531,14 @@ TEST_CASE( "test_kde_euclidean_matmul1", "[naivekde]" ) {
 
 TEST_CASE( "test_kde_euclidean_matmul2", "[naivekde]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
 
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2567,9 +2577,9 @@ TEST_CASE( "test_kde_euclidean_matmul2", "[naivekde]" ) {
   REQUIRE(!array::equal(nX, mu, Z2));
 
   for (int i = 0; i < nX; ++i) {
-    REQUIRE(std::abs(Z1[i] - Z2[i]) < 1e-16);
+    REQUIRE(std::abs(Z1[i] - Z2[i]) < 1e-15);
   }
-  REQUIRE(array::almostEqual(nX, Z1, Z2, 1e-16));
+  REQUIRE(array::almostEqual(nX, Z1, Z2, 1e-15));
   
   REQUIRE(array::almostEqual(nX, mu, Z2, 1e-15));
 
@@ -2581,14 +2591,14 @@ TEST_CASE( "test_kde_euclidean_matmul2", "[naivekde]" ) {
 
 TEST_CASE( "test_kde_euclidean_matmul3", "[naivekde]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
 
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2642,14 +2652,14 @@ TEST_CASE( "test_kde_euclidean_matmul3", "[naivekde]" ) {
 
 TEST_CASE( "test_kde_euclidean_matmul4", "[naivekde]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
 
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2702,14 +2712,14 @@ TEST_CASE( "test_kde_euclidean_matmul4", "[naivekde]" ) {
 
 TEST_CASE( "test_kde_euclidean_matmul5", "[naivekde]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
 
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2743,14 +2753,14 @@ TEST_CASE( "test_kde_euclidean_matmul5", "[naivekde]" ) {
 
 TEST_CASE( "test_kde_euclidean_matmul6", "[naivekde]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
 
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2784,14 +2794,14 @@ TEST_CASE( "test_kde_euclidean_matmul6", "[naivekde]" ) {
 
 TEST_CASE( "test_kde_taxicab1", "[naivekde]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
 
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2807,7 +2817,7 @@ TEST_CASE( "test_kde_taxicab1", "[naivekde]" ) {
     for (int j = 0; j < nX; ++j) {
       float* x = X + j*d;
       float dist = 0;
-      for (int k = 0; k < d; ++k)
+      for (int_t k = 0; k < d; ++k)
 	dist += std::abs(x[k]-q[k]);
       mu[i] += std::exp(-dist/h);
     }
@@ -2857,14 +2867,14 @@ TEST_CASE( "test_kde_taxicab1", "[naivekde]" ) {
 
 TEST_CASE( "test_kde_taxicab2", "[naivekde]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
 
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2880,7 +2890,7 @@ TEST_CASE( "test_kde_taxicab2", "[naivekde]" ) {
     for (int j = 0; j < nY; ++j) {
       double* y = Y + j*d;
       double dist = 0;
-      for (int k = 0; k < d; ++k)
+      for (int_t k = 0; k < d; ++k)
 	dist += std::abs(y[k]-q[k]);
       mu[i] += std::exp(-dist/h);
     }
@@ -2933,13 +2943,13 @@ TEST_CASE( "test_naive_kde1", "[naivekde]" ) {
   NaiveKde<float> nkde(h, Kernel::EXPONENTIAL);
 
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -2947,7 +2957,7 @@ TEST_CASE( "test_naive_kde1", "[naivekde]" ) {
   nkde.fit(nY, d, Y);
 
   float mu1[2173];
-  int samples[2173];
+  int_t samples[2173];
 
   REQUIRE_THROWS_AS(nkde.query(d-1, Y, mu1, samples), std::invalid_argument);
   REQUIRE_THROWS_AS(nkde.query(d+1, Y, mu1, samples), std::invalid_argument);
@@ -3020,20 +3030,20 @@ TEST_CASE( "test_naive_kde2", "[naivekde]" ) {
   NaiveKde<double> nkde(h, Kernel::EXPONENTIAL);
 
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
 
   nkde.fit(nX, d, X);
   
-  int samples[2174];
+  int_t samples[2174];
   double mu1[2174];
 
   REQUIRE_THROWS_AS(nkde.query(d-1, Y, mu1, samples), std::invalid_argument);
@@ -3103,13 +3113,13 @@ TEST_CASE( "test_naive_kde3", "[naivekde]" ) {
   NaiveKde<float> nkde(h, Kernel::GAUSSIAN);
 
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -3126,7 +3136,7 @@ TEST_CASE( "test_naive_kde3", "[naivekde]" ) {
   float mu2[2173];
   kdeEuclideanMatmul(nY, nX, d, h, Y, X, mu2, YSqNorms, scratch,
 		     Kernel::GAUSSIAN);
-  int samples[2173];
+  int_t samples[2173];
   float Z1[2173];
   for (int i = 0; i < nX; ++i) {
     float* q = X + i*d;
@@ -3173,13 +3183,13 @@ TEST_CASE( "test_naive_kde4", "[naivekde]" ) {
   NaiveKde<double> nkde(h, Kernel::GAUSSIAN);
 
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -3197,7 +3207,7 @@ TEST_CASE( "test_naive_kde4", "[naivekde]" ) {
   kdeEuclideanMatmul(nX, nY, d, h, X, Y, mu2, XSqNorms, scratch,
 		     Kernel::GAUSSIAN);
 
-  int samples[2174];
+  int_t samples[2174];
 
   double Z1[2174];
   for (int i = 0; i < nY; ++i) {
@@ -3240,13 +3250,13 @@ TEST_CASE( "test_naive_kde5", "[naivekde]" ) {
   NaiveKde<float> nkde(h, Kernel::LAPLACIAN);
 
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -3260,7 +3270,7 @@ TEST_CASE( "test_naive_kde5", "[naivekde]" ) {
     for (int j = 0; j < nX; ++j) {
       float* x = X + j*d;
       float dist = 0;
-      for (int k = 0; k < d; ++k)
+      for (int_t k = 0; k < d; ++k)
 	dist += std::abs(x[k]-q[k]);
       mu1[i] += std::exp(-dist/h);
     }
@@ -3272,7 +3282,7 @@ TEST_CASE( "test_naive_kde5", "[naivekde]" ) {
   kdeTaxicab(nX, nY, d, h, X, Y, mu2, scratch, Kernel::LAPLACIAN);
 
   float Z1[2174];
-  int samples[2174];
+  int_t samples[2174];
   for (int i = 0; i < nY; ++i) {
     float* q = Y + i*d;
     nkde.query(d, q, Z1 + i, samples + i);
@@ -3322,13 +3332,13 @@ TEST_CASE( "test_naive_kde6", "[naivekde]" ) {
   NaiveKde<double> nkde(h, Kernel::LAPLACIAN);
 
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   REQUIRE(n == 4347);
   REQUIRE(d == 9);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
   REQUIRE(nX == 2173);
   REQUIRE(nY == 2174);
@@ -3342,7 +3352,7 @@ TEST_CASE( "test_naive_kde6", "[naivekde]" ) {
     for (int j = 0; j < nX; ++j) {
       double* x = X + j*d;
       double dist = 0;
-      for (int k = 0; k < d; ++k)
+      for (int_t k = 0; k < d; ++k)
 	dist += std::abs(x[k]-q[k]);
       mu1[i] += std::exp(-dist/h);
     }
@@ -3354,7 +3364,7 @@ TEST_CASE( "test_naive_kde6", "[naivekde]" ) {
   kdeTaxicab(nX, nY, d, h, X, Y, mu2, scratch, Kernel::LAPLACIAN);
 
   double Z1[2174];
-  int samples[2174];
+  int_t samples[2174];
   for (int i = 0; i < nY; ++i) {
     double* q = Y + i*d;
     nkde.query(d, q, Z1 + i, samples + i);
@@ -3406,7 +3416,7 @@ TEST_CASE( "test_naive_kde7", "[naivekde]" ) {
   const int d = 784;
   float X[n*d];
   float Q[m*d];
-  int samples[m];
+  int_t samples[m];
 
   mt19937 rng(1928);
   normal_distribution<float> dist;
@@ -3437,12 +3447,12 @@ TEST_CASE( "test_naive_kde8", "[naivekde]" ) {
   const double h = 16;
   float* data1;
   double* data2;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data1, &n, &d);
 
   float *X1, *Y1;
   double *X2, *Y2;
-  int nX, nY;
+  int_t nX, nY;
   constructMediumTestSet(&data2, &n, &d);
   array::splitInHalf(n,d,&nX,&nY,data1,&X1,&Y1);
   array::splitInHalf(n,d,&nX,&nY,data2,&X2,&Y2);
@@ -3472,16 +3482,16 @@ TEST_CASE( "test_naive_kde8", "[naivekde]" ) {
 
 TEST_CASE( "test_linear_scan1", "[linearscan]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   
   LinearScan<float> ls(Metric::EUCLIDEAN);
   REQUIRE_THROWS_AS(ls.fit(0,d,data), std::invalid_argument);
   REQUIRE_THROWS_AS(ls.fit(n,0,data), std::invalid_argument);
   ls.fit(n,d,data);
-  vector<int> nns(1);
+  vector<int_t> nns(1);
   vector<float> dists(1);
-  vector<int> samples(1);
+  vector<int_t> samples(1);
   ls.query(1, d, 1, data, &nns[0], &dists[0], &samples[0]);
   REQUIRE(nns[0] == 0);
   REQUIRE(dists[0] == 0);
@@ -3495,10 +3505,10 @@ TEST_CASE( "test_linear_scan1", "[linearscan]" ) {
   array::euclideanSqDistances(n, n, d, data, data, &XSqNorms[0], &allDists[0], &scratch[0]);
 
   int m = 100;
-  int k = 50;
-  nns = vector<int>(m*k);
+  int_t k = 50;
+  nns = vector<int_t>(m*k);
   dists = vector<float>(m*k);
-  samples = vector<int>(m);
+  samples = vector<int_t>(m);
   ls.query(m, d, k, data, &nns[0], &dists[0], &samples[0]);
   for (int i = 0; i < m; ++i) {
     REQUIRE(nns[i*k] == i);
@@ -3509,7 +3519,7 @@ TEST_CASE( "test_linear_scan1", "[linearscan]" ) {
 
   m = 5;
   k = n + 2;
-  nns = vector<int>(m*k);
+  nns = vector<int_t>(m*k);
   dists = vector<float>(m*k);
   ls.query(m, d, k, data, &nns[0], &dists[0], &samples[0]);
   for (int i = 0; i < m; ++i) {
@@ -3529,10 +3539,10 @@ TEST_CASE( "test_linear_scan1", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan2", "[linearscan]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
   
   LinearScan<float> ls(Metric::EUCLIDEAN);
@@ -3540,21 +3550,21 @@ TEST_CASE( "test_linear_scan2", "[linearscan]" ) {
 
   const float EPSILON = 1e-3f;
   
-  int k = 1;
-  vector<int> nns(nY*k);
+  int_t k = 1;
+  vector<int_t> nns(nY*k);
   vector<float> dists(nY*k);
   vector<float> scratch(d);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   ls.query(nY, d, k, Y, &nns[0], &dists[0], &samples[0]);
-  for (int s : samples)
+  for (int_t s : samples)
     REQUIRE(s == nX);
 
-  for (int i = 0; i < nY; ++i) {
+  for (int_t i = 0; i < nY; ++i) {
     float* q = Y + i*d;
-    int nnIdx;
+    int_t nnIdx;
     float nnDist = 99999999999999;
-    for (int j = 0; j < nX; ++j) {
+    for (int_t j = 0; j < nX; ++j) {
       float* x = X + j*d;
       float dist = array::euclideanDistance(d, q, x, &scratch[0]);
       if (dist < nnDist) {
@@ -3563,9 +3573,9 @@ TEST_CASE( "test_linear_scan2", "[linearscan]" ) {
       }
     }
 
-    int nn;
+    int_t nn;
     float dist;
-    int samp;
+    int_t samp;
     ls.query(1, d, 1, q, &nn, &dist, &samp);
     REQUIRE(nns[i] == nn);
     REQUIRE(nn == nnIdx);
@@ -3573,7 +3583,7 @@ TEST_CASE( "test_linear_scan2", "[linearscan]" ) {
     REQUIRE(dist == Approx(nnDist).epsilon(EPSILON));
     REQUIRE(samples[i] == samp);
     REQUIRE(samp == nX);
-    for (int j = 0; j < nX; ++j) {
+    for (int_t j = 0; j < nX; ++j) {
       float* x = X + j*d;
       float dist = array::euclideanDistance(d, q, x, &scratch[0]);
       if (j != nn)
@@ -3587,14 +3597,14 @@ TEST_CASE( "test_linear_scan2", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan3", "[linearscan]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   mt19937 rng(1234);
   normal_distribution<float> nd(0,200);
   for (int i = 0; i < n*d; ++i)
     data[i] += nd(rng);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   const float EPSILON = 1e-4f;
@@ -3602,25 +3612,25 @@ TEST_CASE( "test_linear_scan3", "[linearscan]" ) {
   LinearScan<float> ls(Metric::EUCLIDEAN);
   ls.fit(nX, d, X);
 
-  int k = 50;
-  vector<int> nns(nY*k);
+  int_t k = 50;
+  vector<int_t> nns(nY*k);
   vector<float> dists(nY*k);
   vector<float> scratch(d);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   ls.query(nY, d, k, Y, &nns[0], &dists[0], &samples[0]);
   for (int s : samples)
     REQUIRE(s == nX);
 
 
-  vector<int> nnSingle(k);
+  vector<int_t> nnSingle(k);
   vector<float> distsSingle(k);
-  int samplesSingle;
+  int_t samplesSingle;
   for (int i = 0; i < nY; ++i) {
     float* q = Y + i*d;
     ls.query(1, d, k, q, &nnSingle[0], &distsSingle[0], &samplesSingle);
     for (int j = 0; j < k; ++j) {
-      REQUIRE(nns[i*k + j] == nnSingle[j]);
+      REQUIRE((nns[i*k + j] == nnSingle[j] || dists[i*k+j] == distsSingle[j]));
       REQUIRE(dists[i*k + j] == Approx(distsSingle[j]).epsilon(EPSILON));
     }
     REQUIRE(samplesSingle == nX);
@@ -3646,7 +3656,7 @@ TEST_CASE( "test_linear_scan3", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan4", "[linearscan]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   vector<double> XSqNorms(n);
@@ -3659,9 +3669,9 @@ TEST_CASE( "test_linear_scan4", "[linearscan]" ) {
   REQUIRE_THROWS_AS(ls.fit(0,d,data), std::invalid_argument);
   REQUIRE_THROWS_AS(ls.fit(n,0,data), std::invalid_argument);
   ls.fit(n,d,data);
-  vector<int> nns(1);
+  vector<int_t> nns(1);
   vector<double> dists(1);
-  vector<int> samples(1);
+  vector<int_t> samples(1);
   ls.query(1, d, 1, data, &nns[0], &dists[0], &samples[0]);
   REQUIRE(nns[0] == 0);
   REQUIRE((dists[0] == 0 || dists[0] == std::sqrt(allDists[0])));
@@ -3669,21 +3679,22 @@ TEST_CASE( "test_linear_scan4", "[linearscan]" ) {
 
   
   int m = 100;
-  int k = 50;
-  nns = vector<int>(m*k);
+  int_t k = 50;
+  const double EPSILON = 1e-9;
+  nns = vector<int_t>(m*k);
   dists = vector<double>(m*k);
-  samples = vector<int>(m);
+  samples = vector<int_t>(m);
   ls.query(m, d, k, data, &nns[0], &dists[0], &samples[0]);
   for (int i = 0; i < m; ++i) {
     REQUIRE(nns[i*k] == i);
     REQUIRE(dists[i*k] >= 0);
-    REQUIRE((dists[i*k] == 0 || dists[i*k] == std::sqrt(allDists[i*n+i])));
+    REQUIRE((dists[i*k] == 0 || dists[i*k] == Approx(std::sqrt(allDists[i*n+i])).epsilon(EPSILON)));
     REQUIRE(samples[i] == n);
   }
 
   m = 5;
   k = n + 2;
-  nns = vector<int>(m*k);
+  nns = vector<int_t>(m*k);
   dists = vector<double>(m*k);
   ls.query(m, d, k, data, &nns[0], &dists[0], &samples[0]);
   for (int i = 0; i < m; ++i) {
@@ -3702,10 +3713,10 @@ TEST_CASE( "test_linear_scan4", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan5", "[linearscan]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
   
   LinearScan<double> ls(Metric::EUCLIDEAN);
@@ -3713,11 +3724,11 @@ TEST_CASE( "test_linear_scan5", "[linearscan]" ) {
 
   const double EPSILON = 1e-12;
   
-  int k = 1;
-  vector<int> nns(nY*k);
+  int_t k = 1;
+  vector<int_t> nns(nY*k);
   vector<double> dists(nY*k);
   vector<double> scratch(d);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   ls.query(nY, d, k, Y, &nns[0], &dists[0], &samples[0]);
   for (int s : samples)
@@ -3736,9 +3747,9 @@ TEST_CASE( "test_linear_scan5", "[linearscan]" ) {
       }
     }
 
-    int nn;
+    int_t nn;
     double dist;
-    int samp;
+    int_t samp;
     ls.query(1, d, 1, q, &nn, &dist, &samp);
     REQUIRE(nns[i] == nn);
     REQUIRE(nn == nnIdx);
@@ -3760,10 +3771,10 @@ TEST_CASE( "test_linear_scan5", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan6", "[linearscan]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   const double EPSILON = 1e-12;
@@ -3771,19 +3782,19 @@ TEST_CASE( "test_linear_scan6", "[linearscan]" ) {
   LinearScan<double> ls(Metric::EUCLIDEAN);
   ls.fit(nX, d, X);
 
-  int k = 50;
-  vector<int> nns(nY*k);
+  int_t k = 50;
+  vector<int_t> nns(nY*k);
   vector<double> dists(nY*k);
   vector<double> scratch(d);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   ls.query(nY, d, k, Y, &nns[0], &dists[0], &samples[0]);
   for (int s : samples)
     REQUIRE(s == nX);
 
-  vector<int> nnSingle(k);
+  vector<int_t> nnSingle(k);
   vector<double> distsSingle(k);
-  int samplesSingle;
+  int_t samplesSingle;
   for (int i = 0; i < nY; ++i) {
     double* q = Y + i*d;
     ls.query(1, d, k, q, &nnSingle[0], &distsSingle[0], &samplesSingle);
@@ -3793,7 +3804,7 @@ TEST_CASE( "test_linear_scan6", "[linearscan]" ) {
     }
     REQUIRE(samplesSingle == nX);
 
-    set<int> nnSet(nnSingle.begin(), nnSingle.end());
+    set<int_t> nnSet(nnSingle.begin(), nnSingle.end());
     int maxNnIdx = nnSingle[k-1];
     double maxNnDist = array::euclideanDistance(d, q, X + maxNnIdx*d, &scratch[0]);
     for (int j = 0; j < nX; ++j) {
@@ -3814,26 +3825,26 @@ TEST_CASE( "test_linear_scan6", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan7", "[linearscan]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   
   LinearScan<float> ls(Metric::TAXICAB);
   REQUIRE_THROWS_AS(ls.fit(0,d,data), std::invalid_argument);
   REQUIRE_THROWS_AS(ls.fit(n,0,data), std::invalid_argument);
   ls.fit(n,d,data);
-  vector<int> nns(1);
+  vector<int_t> nns(1);
   vector<float> dists(1);
-  vector<int> samples(1);
+  vector<int_t> samples(1);
   ls.query(1, d, 1, data, &nns[0], &dists[0], &samples[0]);
   REQUIRE(nns[0] == 0);
   REQUIRE(dists[0] == 0);
   REQUIRE(samples[0] == n);
 
   int m = 100;
-  int k = 50;
-  nns = vector<int>(m*k);
+  int_t k = 50;
+  nns = vector<int_t>(m*k);
   dists = vector<float>(m*k);
-  samples = vector<int>(m);
+  samples = vector<int_t>(m);
   ls.query(m, d, k, data, &nns[0], &dists[0], &samples[0]);
   for (int i = 0; i < m; ++i) {
     REQUIRE(nns[i*k] == i);
@@ -3843,9 +3854,9 @@ TEST_CASE( "test_linear_scan7", "[linearscan]" ) {
 
   m = 5;
   k = n + 2;
-  nns = vector<int>(m*k);
+  nns = vector<int_t>(m*k);
   dists = vector<float>(m*k);
-  samples = vector<int>(m);
+  samples = vector<int_t>(m);
   ls.query(m, d, k, data, &nns[0], &dists[0], &samples[0]);
   for (int i = 0; i < m; ++i) {
     REQUIRE(nns[i*k] == i);
@@ -3863,20 +3874,20 @@ TEST_CASE( "test_linear_scan7", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan8", "[linearscan]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
   
   LinearScan<float> ls(Metric::TAXICAB);
   ls.fit(nX, d, X);
 
-  int k = 1;
-  vector<int> nns(nY*k);
+  int_t k = 1;
+  vector<int_t> nns(nY*k);
   vector<float> dists(nY*k);
   vector<float> scratch(d);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   ls.query(nY, d, k, Y, &nns[0], &dists[0], &samples[0]);
   for (int s : samples)
@@ -3895,9 +3906,9 @@ TEST_CASE( "test_linear_scan8", "[linearscan]" ) {
       }
     }
 
-    int nn;
+    int_t nn;
     float dist;
-    int samp;
+    int_t samp;
     ls.query(1, d, 1, q, &nn, &dist, &samp);
     REQUIRE(nns[i] == nn);
     REQUIRE(nn == nnIdx);
@@ -3919,26 +3930,26 @@ TEST_CASE( "test_linear_scan8", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan9", "[linearscan]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
   
   LinearScan<float> ls(Metric::TAXICAB);
   ls.fit(nX, d, X);
 
-  int k = 50;
-  vector<int> nns(nY*k);
+  int_t k = 50;
+  vector<int_t> nns(nY*k);
   vector<float> scratch(d);
   vector<float> dists(nY*k);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   ls.query(nY, d, k, Y, &nns[0], &dists[0], &samples[0]);
 
-  vector<int> nnSingle(k);
+  vector<int_t> nnSingle(k);
   vector<float> distsSingle(k);
-  int samplesSingle;
+  int_t samplesSingle;
   for (int i = 0; i < nY; ++i) {
     float* q = Y + i*d;
     ls.query(1, d, k, q, &nnSingle[0], &distsSingle[0], &samplesSingle);
@@ -3970,26 +3981,26 @@ TEST_CASE( "test_linear_scan9", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan10", "[linearscan]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   
   LinearScan<double> ls(Metric::TAXICAB);
   REQUIRE_THROWS_AS(ls.fit(0,d,data), std::invalid_argument);
   REQUIRE_THROWS_AS(ls.fit(n,0,data), std::invalid_argument);
   ls.fit(n,d,data);
-  vector<int> nns(1);
+  vector<int_t> nns(1);
   vector<double> dists(1);
-  vector<int> samples(1);
+  vector<int_t> samples(1);
   ls.query(1, d, 1, data, &nns[0], &dists[0], &samples[0]);
   REQUIRE(nns[0] == 0);
   REQUIRE(dists[0] == 0);
   REQUIRE(samples[0] == n);
 
   int m = 100;
-  int k = 50;
-  nns = vector<int>(m*k);
+  int_t k = 50;
+  nns = vector<int_t>(m*k);
   dists = vector<double>(m*k);
-  samples = vector<int>(m);
+  samples = vector<int_t>(m);
   ls.query(m, d, k, data, &nns[0], &dists[0], &samples[0]);
   for (int i = 0; i < m; ++i) {
     REQUIRE(nns[i*k] == i);
@@ -3999,9 +4010,9 @@ TEST_CASE( "test_linear_scan10", "[linearscan]" ) {
 
   m = 5;
   k = n + 2;
-  nns = vector<int>(m*k);
+  nns = vector<int_t>(m*k);
   dists = vector<double>(m*k);
-  samples = vector<int>(m);
+  samples = vector<int_t>(m);
   ls.query(m, d, k, data, &nns[0], &dists[0], &samples[0]);
   for (int i = 0; i < m; ++i) {
     REQUIRE(nns[i*k] == i);
@@ -4019,20 +4030,20 @@ TEST_CASE( "test_linear_scan10", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan11", "[linearscan]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
   
   LinearScan<double> ls(Metric::TAXICAB);
   ls.fit(nX, d, X);
 
-  int k = 1;
-  vector<int> nns(nY*k);
+  int_t k = 1;
+  vector<int_t> nns(nY*k);
   vector<double> dists(nY*k);
   vector<double> scratch(d);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   ls.query(nY, d, k, Y, &nns[0], &dists[0], &samples[0]);
   for (int s : samples)
@@ -4051,9 +4062,9 @@ TEST_CASE( "test_linear_scan11", "[linearscan]" ) {
       }
     }
 
-    int nn;
+    int_t nn;
     double dist;
-    int samp;
+    int_t samp;
     ls.query(1, d, 1, q, &nn, &dist, &samp);
     REQUIRE(nns[i] == nn);
     REQUIRE(nn == nnIdx);
@@ -4075,26 +4086,26 @@ TEST_CASE( "test_linear_scan11", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan12", "[linearscan]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
   
   LinearScan<double> ls(Metric::TAXICAB);
   ls.fit(nX, d, X);
 
-  int k = 50;
-  vector<int> nns(nY*k);
+  int_t k = 50;
+  vector<int_t> nns(nY*k);
   vector<double> dists(nY*k);
   vector<double> scratch(d);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   ls.query(nY, d, k, Y, &nns[0], &dists[0], &samples[0]);
 
-  vector<int> nnSingle(k);
+  vector<int_t> nnSingle(k);
   vector<double> distsSingle(k);
-  int samplesSingle;
+  int_t samplesSingle;
   for (int i = 0; i < nY; ++i) {
     double* q = Y + i*d;
     ls.query(1, d, k, q, &nnSingle[0], &distsSingle[0], &samplesSingle);
@@ -4126,10 +4137,10 @@ TEST_CASE( "test_linear_scan12", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan13", "[linearscan]" ) {
   float* data1;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data1, &n, &d);
   float *X1, *Y1;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data1, &X1, &Y1);
 
   double* data2;
@@ -4143,14 +4154,14 @@ TEST_CASE( "test_linear_scan13", "[linearscan]" ) {
     ls1.fit(nX, d, X1);
     ls2.fit(nY, d, Y2);
 
-    vector<int> nns1(nX*nY);
-    vector<int> nns2(nX*nY);
+    vector<int_t> nns1(nX*nY);
+    vector<int_t> nns2(nX*nY);
     vector<float> dists1(nX*nY);
     vector<double> dists2(nX*nY);
     vector<float> scratch1(d);
     vector<double> scratch2(d);
-    vector<int> samples1(nY);
-    vector<int> samples2(nX);
+    vector<int_t> samples1(nY);
+    vector<int_t> samples2(nX);
 
     ls1.query(nY, d, nX, Y1, &nns1[0], &dists1[0], &samples1[0]);
     ls2.query(nX, d, nY, X2, &nns2[0], &dists2[0], &samples2[0]);
@@ -4214,10 +4225,10 @@ TEST_CASE( "test_linear_scan13", "[linearscan]" ) {
 
 TEST_CASE( "test_linear_scan14", "[linearscan]" ) {
   float* data1;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data1, &n, &d);
   float *X1, *Y1;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data1, &X1, &Y1);
 
   double* data2;
@@ -4235,18 +4246,18 @@ TEST_CASE( "test_linear_scan14", "[linearscan]" ) {
     ls3.fit(nX, d, X2);
     ls4.fit(nX, d, X2);   
 
-    vector<int> nns1(nX*nY);
-    vector<int> nns2(nX*nY);
-    vector<int> nns3(nX*nY);
-    vector<int> nns4(nX*nY);
+    vector<int_t> nns1(nX*nY);
+    vector<int_t> nns2(nX*nY);
+    vector<int_t> nns3(nX*nY);
+    vector<int_t> nns4(nX*nY);
     vector<float> dists1(nX*nY);
     vector<float> dists2(nX*nY);
     vector<double> dists3(nX*nY);
     vector<double> dists4(nX*nY);
-    vector<int> samples1(nY);
-    vector<int> samples2(nY);
-    vector<int> samples3(nY);
-    vector<int> samples4(nY);
+    vector<int_t> samples1(nY);
+    vector<int_t> samples2(nY);
+    vector<int_t> samples3(nY);
+    vector<int_t> samples4(nY);
     vector<float> scratch1(d);
     vector<double> scratch2(d);
 
@@ -4256,9 +4267,9 @@ TEST_CASE( "test_linear_scan14", "[linearscan]" ) {
     ls4.query(nY, d, nX, Y2, &nns4[0], &dists4[0], &samples4[0]);
 
     REQUIRE(array::allEqual(nY, &samples1[0], nX));
-    REQUIRE(array::allEqual(nY, &samples2[0], -1));
+    REQUIRE(array::allEqual(nY, &samples2[0], static_cast<int_t>(-1)));
     REQUIRE(array::allEqual(nY, &samples3[0], nX));
-    REQUIRE(array::allEqual(nY, &samples4[0], -1));
+    REQUIRE(array::allEqual(nY, &samples4[0], static_cast<int_t>(-1)));
 
     const float EPSILON1 = 1e-3f;
     const double EPSILON2 = 1e-12;
@@ -4299,10 +4310,10 @@ TEST_CASE( "test_linear_scan14", "[linearscan]" ) {
 
 TEST_CASE( "test_random_sampling1", "[randomsampling]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
   uint32_t seed = 9371;
 
@@ -4312,10 +4323,14 @@ TEST_CASE( "test_random_sampling1", "[randomsampling]" ) {
   vector<float> mu(nY);
   vector<float> Z1(nY);
   vector<float> Z2(nY);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN, Kernel::LAPLACIAN }) {
-    for (int m  : { 1, 5, 123, nX, 2*nX }) {
+    for (int_t m : {
+	static_cast<int_t>(1),
+	static_cast<int_t>(5),
+	static_cast<int_t>(123),
+	nX, 2*nX }) {
       seed = mt19937(seed)();
       KdeEstimator::PseudoRandomNumberGenerator rng(nX, seed);
       
@@ -4401,10 +4416,10 @@ TEST_CASE( "test_random_sampling1", "[randomsampling]" ) {
 
 TEST_CASE( "test_random_sampling2", "[randomsampling]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
   uint32_t seed = 3917;
 
@@ -4414,10 +4429,14 @@ TEST_CASE( "test_random_sampling2", "[randomsampling]" ) {
   vector<double> mu(nY);
   vector<double> Z1(nY);
   vector<double> Z2(nY);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN, Kernel::LAPLACIAN }) {
-    for (int m  : { 1, 7, 234, nX, 3*nX+1 }) {
+    for (int_t m  : {
+	static_cast<int_t>(1),
+	static_cast<int_t>(7),
+	static_cast<int_t>(234),
+	nX, 3*nX+1 }) {
       seed = mt19937(seed)();
       KdeEstimator::PseudoRandomNumberGenerator rng(nX, seed);
       
@@ -4505,17 +4524,17 @@ TEST_CASE( "test_random_sampling3", "[randomsampling]" ) {
   const double h = 16;
   float* data1;
   double* data2;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data1, &n, &d);
 
   float *X1, *Y1;
   double *X2, *Y2;
-  int nX, nY;
+  int_t nX, nY;
   constructMediumTestSet(&data2, &n, &d);
   array::splitInHalf(n,d,&nX,&nY,data1,&X1,&Y1);
   array::splitInHalf(n,d,&nX,&nY,data2,&X2,&Y2);
 
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   const uint32_t seed = 918273;
 
@@ -4548,9 +4567,9 @@ TEST_CASE( "test_random_sampling3", "[randomsampling]" ) {
     REQUIRE_THROWS_AS(rs2.resetParameters(0,nullopt), invalid_argument);
     REQUIRE_THROWS_AS(rs2.resetParameters(-1,nullopt), invalid_argument);
 
-    int m1 = 123;
-    int m2 = 234;
-    int m3 = 345;
+    int_t m1 = 123;
+    int_t m2 = 234;
+    int_t m3 = 345;
   
     rs1 = RandomSampling<float>(h, kernel, m1);
     rs2 = RandomSampling<double>(h, kernel, m1);
@@ -4561,7 +4580,7 @@ TEST_CASE( "test_random_sampling3", "[randomsampling]" ) {
     vector<float> Z1_2(nY);
     vector<double> Z2_2(nY);
 
-    for (int m : { m1, m2, m3 }) {
+    for (int_t m : { m1, m2, m3 }) {
       rs1.resetSeed(seed);
       rs1.resetParameters(m);
       rs1.query(nY, d, Y1, &Z1_1[0], &samples[0]);
@@ -4600,14 +4619,14 @@ TEST_CASE( "test_random_sampling3", "[randomsampling]" ) {
 
 TEST_CASE( "test_kde_subset1", "[kdesubset]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   const uint32_t seed = 0xb1c72b79;
-  const int k = 300;
+  const int_t k = 300;
   const float h = 23;
   const float EPSILON = 1e-4f;
   const float DELTA = 1e-4f;
@@ -4673,14 +4692,14 @@ TEST_CASE( "test_kde_subset1", "[kdesubset]" ) {
 
 TEST_CASE( "test_kde_subset2", "[kdesubset]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   const uint32_t seed = 0xb30a7eaf;
-  const int k = 300;
+  const int_t k = 300;
   const double h = 23;
   const double EPSILON = 1e-14;
   const double DELTA = 1e-16;
@@ -4747,15 +4766,15 @@ TEST_CASE( "test_kde_subset2", "[kdesubset]" ) {
 
 TEST_CASE( "test_ann_estimator1", "[annestimator]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
   
-  int m = 0;
+  int_t m = 0;
 
   float h = 24;
 
@@ -4799,15 +4818,15 @@ TEST_CASE( "test_ann_estimator1", "[annestimator]" ) {
 
 TEST_CASE( "test_ann_estimator2", "[annestimator]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
-  int m = 0;
+  int_t m = 0;
 
-  vector<int> samples(nX);
+  vector<int_t> samples(nX);
   double h = 25;
 
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN,
@@ -4851,17 +4870,17 @@ TEST_CASE( "test_ann_estimator2", "[annestimator]" ) {
 
 TEST_CASE( "test_ann_estimator3", "[annestimator]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   const int seed = 68435;
-  const int k = 0;
+  const int_t k = 0;
 
   float h = 26;
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
   vector<float> scratch(d);
   vector<float> mu1(nY);
   vector<float> mu2(nY);
@@ -4870,7 +4889,7 @@ TEST_CASE( "test_ann_estimator3", "[annestimator]" ) {
   
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN,
 	Kernel::LAPLACIAN }) {
-    for (int m : { 1, 5, 100, 500, nX, 2*nX }) {
+    for (int_t m : { static_cast<int_t>(1), static_cast<int_t>(5), static_cast<int_t>(100), static_cast<int_t>(500), nX, 2*nX }) {
       KdeEstimator::PseudoRandomNumberGenerator rng(nX, seed);
       LinearScan<float> ls(kernel == Kernel::LAPLACIAN ? Metric::TAXICAB :
 			   Metric::EUCLIDEAN);
@@ -4955,15 +4974,15 @@ TEST_CASE( "test_ann_estimator3", "[annestimator]" ) {
 
 TEST_CASE( "test_ann_estimator4", "[annestimator]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   const int seed = 79546;
 
-  const int k = 0;
+  const int_t k = 0;
 
   double h = 29;
   vector<double> scratch(d);
@@ -4971,11 +4990,13 @@ TEST_CASE( "test_ann_estimator4", "[annestimator]" ) {
   vector<double> mu2(nY);
   vector<double> Z1(nY);
   vector<double> Z2(nY);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
   
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN,
 	Kernel::LAPLACIAN }) {
-    for (int m : { 1, 13, 101, 765, nX+1, 3*nX-1 }) {
+    for (int_t m : { static_cast<int_t>(1), static_cast<int_t>(13),
+		    static_cast<int_t>(101), static_cast<int_t>(765),
+		    nX+1, 3*nX-1 }) {
       KdeEstimator::PseudoRandomNumberGenerator rng(nX, seed);
       LinearScan<double> ls(kernel == Kernel::LAPLACIAN ? Metric::TAXICAB :
 			   Metric::EUCLIDEAN);
@@ -5061,10 +5082,10 @@ TEST_CASE( "test_ann_estimator4", "[annestimator]" ) {
 
 TEST_CASE( "test_ann_estimator5", "[annestimator]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   const int seed = 1155487;
@@ -5076,14 +5097,18 @@ TEST_CASE( "test_ann_estimator5", "[annestimator]" ) {
   vector<float> scratch(d);
   vector<float> mu(nY);
   vector<float> Z(nY);
-  vector<int> nns(2*nX,-1);
+  vector<int_t> nns(2*nX,-1);
   vector<float> dists(2*nX,-1);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN,
 	Kernel::LAPLACIAN }) {
-    for (int k : { 0, 1, 11, 103, nX, 2*nX }) {
-      for (int m : { 0, 1, 7, 100, nX, 2*nX }) {
+    for (int_t k : { static_cast<int_t>(0), static_cast<int_t>(1),
+		    static_cast<int_t>(11), static_cast<int_t>(103),
+		    nX, 2*nX }) {
+      for (int_t m : { static_cast<int_t>(0), static_cast<int_t>(1),
+		      static_cast<int_t>(7), static_cast<int_t>(100),
+		      nX, 2*nX }) {
 	KdeEstimator::PseudoRandomNumberGenerator rng(nX, seed);
 	LinearScan<float> ls(kernel == Kernel::LAPLACIAN ? Metric::TAXICAB :
 			     Metric::EUCLIDEAN);
@@ -5171,10 +5196,10 @@ TEST_CASE( "test_ann_estimator5", "[annestimator]" ) {
 
 TEST_CASE( "test_ann_estimator6", "[annestimator]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   const int seed = 1256395;
@@ -5186,14 +5211,18 @@ TEST_CASE( "test_ann_estimator6", "[annestimator]" ) {
   vector<double> scratch(d);
   vector<double> mu(nY);
   vector<double> Z(nY);
-  vector<int> nns(2*nX,-1);
+  vector<int_t> nns(2*nX,-1);
   vector<double> dists(2*nX,-1);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN,
 	Kernel::LAPLACIAN }) {
-    for (int k : { 0, 1, 11, 103, nX, 2*nX }) {
-      for (int m : { 0, 1, 7, 100, nX, 2*nX }) {
+    for (int_t k : { static_cast<int_t>(0), static_cast<int_t>(1),
+		    static_cast<int_t>(11), static_cast<int_t>(103),
+		    nX, 2*nX }) {
+      for (int_t m : { static_cast<int_t>(0), static_cast<int_t>(1),
+		      static_cast<int_t>(7), static_cast<int_t>(100),
+		      nX, 2*nX }) {
 	KdeEstimator::PseudoRandomNumberGenerator rng(nX, seed);
 	LinearScan<double> ls(kernel == Kernel::LAPLACIAN ? Metric::TAXICAB :
 			     Metric::EUCLIDEAN);
@@ -5281,12 +5310,12 @@ TEST_CASE( "test_ann_estimator7", "[annestimator]" ) {
   const double h = 16;
   float* data1;
   double* data2;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data1, &n, &d);
 
   float *X1, *Y1;
   double *X2, *Y2;
-  int nX, nY;
+  int_t nX, nY;
   constructMediumTestSet(&data2, &n, &d);
   array::splitInHalf(n,d,&nX,&nY,data1,&X1,&Y1);
   array::splitInHalf(n,d,&nX,&nY,data2,&X2,&Y2);
@@ -5339,12 +5368,14 @@ TEST_CASE( "test_ann_estimator7", "[annestimator]" ) {
   vector<double> Z2_1(nY);
   vector<float> Z1_2(nY);
   vector<double> Z2_2(nY);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   const int seed = 8520;
 
-  for (int k : { 0, 11, 22, 33 }) {
-    for (int m : { 0, 123, 234, 345 }) {
+  for (int_t k : { static_cast<int_t>(0), static_cast<int_t>(11),
+		  static_cast<int_t>(22), static_cast<int_t>(33) }) {
+    for (int_t m : { static_cast<int_t>(0), static_cast<int_t>(123),
+		    static_cast<int_t>(234), static_cast<int_t>(345) }) {
       ann1.resetParameters(k, m);
       ann1.resetSeed(seed);
       ann1.query(nY, d, Y1, &Z1_1[0], &samples[0]);
@@ -5382,10 +5413,10 @@ TEST_CASE( "test_ann_estimator7", "[annestimator]" ) {
 
 TEST_CASE( "test_ann_estimator8", "[annestimator]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   const int seed = 0xeef5d8dc;
@@ -5395,12 +5426,14 @@ TEST_CASE( "test_ann_estimator8", "[annestimator]" ) {
 
   vector<float> Z1(nY);
   vector<float> Z2(nY);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN,
 	Kernel::LAPLACIAN }) {
-    for (int k : { 0, 1, 33, nX }) {
-      for (int m : { 0, 1, 47, nX }) {
+    for (int_t k : { static_cast<int_t>(0), static_cast<int_t>(1),
+		    static_cast<int_t>(33), nX }) {
+      for (int_t m : { static_cast<int_t>(0), static_cast<int_t>(1),
+		      static_cast<int_t>(47), nX }) {
 	LinearScan<float> ls1(kernel == Kernel::LAPLACIAN ? Metric::TAXICAB :
 			      Metric::EUCLIDEAN, true);
 	ls1.fit(nX, d, X);
@@ -5452,10 +5485,10 @@ TEST_CASE( "test_ann_estimator8", "[annestimator]" ) {
   
 TEST_CASE( "test_ann_estimator9", "[annestimator]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   const int seed = 0x96a3d6ab;
@@ -5465,12 +5498,14 @@ TEST_CASE( "test_ann_estimator9", "[annestimator]" ) {
 
   vector<double> Z1(nY);
   vector<double> Z2(nY);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN,
 	Kernel::LAPLACIAN }) {
-    for (int k : { 0, 1, 33, nX }) {
-      for (int m : { 0, 1, 47, nX }) {
+    for (int_t k : { static_cast<int_t>(0), static_cast<int_t>(1),
+		    static_cast<int_t>(33), nX }) {
+      for (int_t m : { static_cast<int_t>(0), static_cast<int_t>(1),
+		      static_cast<int_t>(47), nX }) {
 	LinearScan<double> ls1(kernel == Kernel::LAPLACIAN ? Metric::TAXICAB :
 			      Metric::EUCLIDEAN, true);
 	ls1.fit(nX, d, X);
@@ -5542,7 +5577,7 @@ TEST_CASE( "test_hash1", "[rng]" ) {
 
   uint32_t x = hash_to_range(m, ~0, a, b);
   for (uint32_t m : { 100, 234, 555, 1234 }) {
-    vector<int> spots(m,0);
+    vector<int_t> spots(m,0);
     for (uint32_t i = 0; i < 100*m; ++i) {
       uint32_t h = hash_to_range(x, m, a, b);
       REQUIRE(h < m);
@@ -5589,10 +5624,10 @@ TEST_CASE( "test_mt19937_rng", "[rng]" ) {
 #endif
 
   
-  for (int m : { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 51, 101, 503, 1000,
+  for (int_t m : { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 51, 101, 503, 1000,
 	1000000 }) {
     uint32_t seed = mt19937(m)();
-    vector<int> found(m,0);
+    vector<int_t> found(m,0);
     Mt19937Rng rng(m, seed);
     for (int i = 0; i < 17*m; ++i) {
       uint32_t idx = rng();
@@ -5609,16 +5644,16 @@ TEST_CASE( "test_mt19937_rng", "[rng]" ) {
 
 
 
-TEST_CASE( "test_fast_rng", "[rng]" ) {
-  REQUIRE(gcd(1071,462) == 21);
+TEST_CASE( "test_fast_rng32", "[rng]" ) {
+  REQUIRE(gcd<uint64_t>(1071,462) == 21);
   for (uint64_t x = 1; x < 103; ++x) {
-    REQUIRE(gcd(x,103) == 1);
-    REQUIRE(gcd(x,x) == x);
+    REQUIRE(gcd<uint64_t>(x,103) == 1);
+    REQUIRE(gcd<uint64_t>(x,x) == x);
   }
   for (uint64_t x : { 2, 7, 17 }) {
     for (uint64_t y : { 3, 11, 19 }) {
       for (uint64_t z : { 5, 13, 23 }) {
-	REQUIRE(gcd(x*y,y*z) == y);
+	REQUIRE(gcd<uint64_t>(x*y,y*z) == y);
       }
     }
   }
@@ -5627,13 +5662,13 @@ TEST_CASE( "test_fast_rng", "[rng]" ) {
   mt19937 mtrng(seedseed);
 
   uint32_t seed = mtrng();
-  REQUIRE_THROWS_AS(FastRng(0, seed), invalid_argument);
+  REQUIRE_THROWS_AS(FastRng32(0, seed), invalid_argument);
 
   for (uint32_t m : { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 21, 35, 74, 100, 1100,
 	12345, 100000 }) {
     seed = mtrng();
-    FastRng rng(m, seed);
-    FastRng rng2(m, seed);
+    FastRng32 rng(m, seed);
+    FastRng32 rng2(m, seed);
     mt19937 mtrng2(seed);
 
     uint64_t a; 
@@ -5641,27 +5676,27 @@ TEST_CASE( "test_fast_rng", "[rng]" ) {
       a = mtrng2();
       a = (a << 32) | mtrng2();
     }
-    while (gcd(a,m) != 1);
+    while (gcd<uint64_t>(a,m) != 1);
 
 #ifdef DEANN_ENABLE_DEBUG_ACCESSORS
     REQUIRE(a == rng.a);
 #endif // DEANN_ENABLE_DEBUG_ACCESSORS
-    REQUIRE(gcd(a,m) == 1);
+    REQUIRE(gcd<uint64_t>(a,m) == 1);
 
     uint64_t b; 
     do {
       b = mtrng2();
       b = (b << 32) | mtrng2();
     }
-    while (gcd(b,m) != 1);
+    while (gcd<uint64_t>(b,m) != 1);
 
 #ifdef DEANN_ENABLE_DEBUG_ACCESSORS
     REQUIRE(b == rng.b);
 #endif // DEANN_ENABLE_DEBUG_ACCESSORS
-    REQUIRE(gcd(b,m) == 1);
+    REQUIRE(gcd<uint64_t>(b,m) == 1);
 
-    uint32_t x = mtrng2();
 #ifdef DEANN_ENABLE_DEBUG_ACCESSORS
+    uint32_t x = mtrng2();
     REQUIRE(x == rng.x);
 #endif // DEANN_ENABLE_DEBUG_ACCESSORS
 
@@ -5750,20 +5785,21 @@ TEST_CASE( "test_fast_rng", "[rng]" ) {
 }
 
 
+
 TEST_CASE( "test_random_sampling_permuted1", "[randomsamplingpermuted]" ) {
   const uint32_t seedseed = 0xe6408d13;
   mt19937 seedRng(seedseed);
 
   const float h = 16;
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
 
-  const int m = 100;
+  const int_t m = 100;
 
   REQUIRE_THROWS_AS(RandomSamplingPermuted<float>(0.0, Kernel::EXPONENTIAL, m),
 		    invalid_argument);
@@ -5795,7 +5831,7 @@ TEST_CASE( "test_random_sampling_permuted1", "[randomsamplingpermuted]" ) {
   vector<float> Z2(nY);
   vector<float> Z3(nY);
 
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN }) {
     uint32_t seed = seedRng();
@@ -5924,14 +5960,14 @@ TEST_CASE( "test_random_sampling_permuted2", "[randomsamplingpermuted]" ) {
 
   const double h = 27;
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
 
-  const int m = 103;
+  const int_t m = 103;
 
   REQUIRE_THROWS_AS(RandomSamplingPermuted<double>(0.0, Kernel::EXPONENTIAL, m),
 		    invalid_argument);
@@ -5962,7 +5998,7 @@ TEST_CASE( "test_random_sampling_permuted2", "[randomsamplingpermuted]" ) {
   vector<double> Z1(nY);
   vector<double> Z2(nY);
   vector<double> Z3(nY);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN }) {
     uint32_t seed = seedRng();
@@ -6077,11 +6113,11 @@ TEST_CASE( "test_random_sampling_permuted3", "[randomsamplingpermuted]" ) {
 
   const float h = 27;
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
 
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n,d,&nX,&nY,data,&X,&Y);
 
   RandomSamplingPermuted rsp(h, Kernel::EXPONENTIAL, 2*nX, seed);
@@ -6095,10 +6131,10 @@ TEST_CASE( "test_random_sampling_permuted3", "[randomsamplingpermuted]" ) {
 
 TEST_CASE( "test_ann_estimator_permuted3", "[annestimatorpermuted]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   LinearScan<float> ls(Metric::EUCLIDEAN);
@@ -6130,10 +6166,10 @@ TEST_CASE( "test_ann_estimator_permuted3", "[annestimatorpermuted]" ) {
 
 TEST_CASE( "test_missing", "[missing]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
     float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
   
   int seed = 1234;
@@ -6145,10 +6181,10 @@ TEST_CASE( "test_missing", "[missing]" ) {
   vector<float> Z2(nY);
   vector<float> Z3(nY);
   vector<float> Z4(nY);
-  vector<int> samples1(nY);
-  vector<int> samples2(nY);
-  vector<int> samples3(nY);
-  vector<int> samples4(nY);
+  vector<int_t> samples1(nY);
+  vector<int_t> samples2(nY);
+  vector<int_t> samples3(nY);
+  vector<int_t> samples4(nY);
     
   
   NaiveKde<float> nkde(h, Kernel::EXPONENTIAL);
@@ -6161,8 +6197,8 @@ TEST_CASE( "test_missing", "[missing]" ) {
   float EPSILON = 1e-4f;
   
   float Z;
-  int S;
-  for (int i = 0; i < nY; ++i) {
+  int_t S;
+  for (int_t i = 0; i < nY; ++i) {
     nkde.query(d, Y + i*d, &Z, &S);
     REQUIRE(S == nX);
     REQUIRE(Z == Approx(Z1[i]).epsilon(EPSILON));
@@ -6170,7 +6206,7 @@ TEST_CASE( "test_missing", "[missing]" ) {
     REQUIRE(Z == Approx(Z1[i]).epsilon(EPSILON));
   }
 
-  int m = 123;
+  int_t m = 123;
   
   RandomSampling<float> rs1(h, Kernel::EXPONENTIAL, m, seed);
   RandomSampling<float> rs2(h, Kernel::EXPONENTIAL, m, seed);
@@ -6182,7 +6218,7 @@ TEST_CASE( "test_missing", "[missing]" ) {
   REQUIRE(array::equal(nY, &Z1[0], &Z2[0]));
   rs1.resetSeed(seed);
   rs2.resetSeed(seed);
-  for (int i = 0; i < nY; ++i) {
+  for (int_t i = 0; i < nY; ++i) {
     rs1.query(d, Y + i*d, &Z, &S);
     REQUIRE(S == m);
     REQUIRE(Z == Z1[i]);
@@ -6200,7 +6236,7 @@ TEST_CASE( "test_missing", "[missing]" ) {
   REQUIRE(array::equal(nY, &Z1[0], &Z2[0]));
   rsp1.resetSeed(seed);
   rsp2.resetSeed(seed);
-  for (int i = 0; i < nY; ++i) {
+  for (int_t i = 0; i < nY; ++i) {
     rsp1.query(d, Y + i*d, &Z, &S);
     REQUIRE(S == m);
     REQUIRE(Z == Z1[i]);
@@ -6208,8 +6244,8 @@ TEST_CASE( "test_missing", "[missing]" ) {
     REQUIRE(Z == Z1[i]);
   }
 
-  for (int k : { 0, 123, nX }) {
-    for (int m : { 0, 123 }) {
+  for (int_t k : { static_cast<int_t>(0), static_cast<int_t>(123), nX }) {
+    for (int_t m : { static_cast<int_t>(0), static_cast<int_t>(123) }) {
       LinearScan<float> ls1(Metric::EUCLIDEAN, true, true);
       LinearScan<float> ls2(Metric::EUCLIDEAN, false, true);
       LinearScan<float> ls3(Metric::EUCLIDEAN, true, false);
@@ -6285,7 +6321,7 @@ TEST_CASE( "test_missing", "[missing]" ) {
       ann3.resetSeed(seed);
       ann4.resetSeed(seed);
       
-      for (int i = 0; i < nY; ++i) {
+      for (int_t i = 0; i < nY; ++i) {
         float* q = Y + i*d;
         ann1.query(d, q, &Z, &S);
         REQUIRE(Z == mu1[i]);
@@ -6309,7 +6345,7 @@ TEST_CASE( "test_missing", "[missing]" ) {
       ann3.resetSeed(seed);
       ann4.resetSeed(seed);
 
-      for (int i = 0; i < nY; ++i) {
+      for (int_t i = 0; i < nY; ++i) {
         float* q = Y + i*d;
         ann1.query(d, q, &Z, nullptr);
         REQUIRE(Z == mu1[i]);
@@ -6333,10 +6369,10 @@ TEST_CASE( "test_missing", "[missing]" ) {
 
 TEST_CASE( "test_ann_estimator_permuted1", "[annestimatorpermuted]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   LinearScan<float> ls(Metric::EUCLIDEAN);
@@ -6348,7 +6384,7 @@ TEST_CASE( "test_ann_estimator_permuted1", "[annestimatorpermuted]" ) {
 
   vector<float> mu(nY);
   vector<float> Z(nY);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   REQUIRE_THROWS_AS((AnnEstimatorPermuted<float,LinearScan<float>>
                      (0, Kernel::EXPONENTIAL, 0, 0, &ls)),
@@ -6383,21 +6419,21 @@ TEST_CASE( "test_ann_estimator_permuted1", "[annestimatorpermuted]" ) {
   REQUIRE_THROWS_AS(aep.query(d-1, X, &Z[0]), invalid_argument);
   
   vector<uint32_t> indices(nX);
-  for (int i = 0; i < nX; ++i)
+  for (int_t i = 0; i < nX; ++i)
     indices[i] = i;
   std::mt19937 rng(seed);
   std::shuffle(indices.begin(), indices.end(), rng);
 #ifdef DEANN_ENABLE_DEBUG_ACCESSORS
   REQUIRE(array::equal(nX, &indices[0], aep.getXpermutedIdx()));
   const float* Xp = aep.getXpermuted();
-  for (int i = 0; i < nX; ++i) {
+  for (int_t i = 0; i < nX; ++i) {
     REQUIRE(array::equal(d, X + indices[i]*d, Xp + i*d));
   }
 #endif // DEANN_ENABLE_DEBUG_ACCESSORS
 
   aep.query(nY, d, Y, &Z[0], &samples[0]);
   REQUIRE(array::allEqual(d, &Z[0], 0.0f));
-  REQUIRE(array::allEqual(d, &samples[0], 0));
+  REQUIRE(array::allEqual(d, &samples[0], static_cast<int_t>(0)));
   
   RandomSamplingPermuted rsp(h, Kernel::EXPONENTIAL, 1, seed);
   rsp.fit(nX, d, X);
@@ -6409,7 +6445,7 @@ TEST_CASE( "test_ann_estimator_permuted1", "[annestimatorpermuted]" ) {
   const float DELTA = 1e-6f;
   
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN }) {
-    const int m = 500;
+    const int_t m = 500;
     aep = AnnEstimatorPermuted<float,LinearScan<float>>(h, kernel, 0, m, &ls, seed);
     aep.fit(nX, d, X);
     rsp = RandomSamplingPermuted(h, kernel, m, seed);
@@ -6420,7 +6456,7 @@ TEST_CASE( "test_ann_estimator_permuted1", "[annestimatorpermuted]" ) {
     aep.query(nY, d, Y, &Z[0], &samples[0]);
     rsp.query(nY, d, Y, &mu[0]);
 
-    for (int i = 0; i < nY; ++i) {
+    for (int_t i = 0; i < nY; ++i) {
       REQUIRE(std::abs(mu[i] - Z[i]) < DELTA);
     }
     
@@ -6434,14 +6470,14 @@ TEST_CASE( "test_ann_estimator_permuted1", "[annestimatorpermuted]" ) {
     aep.query(nY, d, Y, &Z[0], &samples[0]);
     nkde.query(nY, d, Y, &mu[0]);
 
-    for (int i = 0; i < nY; ++i) {
+    for (int_t i = 0; i < nY; ++i) {
       REQUIRE(std::abs(mu[i] - Z[i]) < DELTA);
     }
 
     REQUIRE(array::allEqual(nY, &samples[0], nX));    
     REQUIRE(array::almostEqual(nY, &mu[0], &Z[0], DELTA));
 
-    const int k = 1000;
+    const int_t k = 1000;
     aep = AnnEstimatorPermuted<float,LinearScan<float>>(h, kernel, k, m, &ls, seed);
     aep.fit(nX, d, X);
 
@@ -6451,11 +6487,11 @@ TEST_CASE( "test_ann_estimator_permuted1", "[annestimatorpermuted]" ) {
       else
         return std::exp(-dist*dist/h/h/2);
     };
-    vector<int> nns(k);
+    vector<int_t> nns(k);
     vector<float> dists(k);
     vector<float> scratch(d);
-    int idx = 0;
-    for (int i = 0; i < nY; ++i) {
+    int_t idx = 0;
+    for (int_t i = 0; i < nY; ++i) {
       float* q = Y + i*d;
       ls.query(d, k, q, &nns[0], &dists[0]);
       float Z1 = 0;
@@ -6463,12 +6499,12 @@ TEST_CASE( "test_ann_estimator_permuted1", "[annestimatorpermuted]" ) {
         Z1 += kfun(dist);
 
       float Z2 = 0;
-      int rsCount = 0;
-      int rsSampleCount = 0;
-      int correctionCount = 0;
+      int_t rsCount = 0;
+      int_t rsSampleCount = 0;
+      int_t correctionCount = 0;
       float correctionAmount = 0;
       while (rsCount < m) {
-        int id = indices[idx];
+        int_t id = indices[idx];
         float* x = X + id*d;
         float dist = array::euclideanDistance(d, q, x, &scratch[0]);
         if (std::find(nns.begin(), nns.end(), id) == nns.end()) {
@@ -6492,7 +6528,7 @@ TEST_CASE( "test_ann_estimator_permuted1", "[annestimatorpermuted]" ) {
       REQUIRE(std::abs(Z[i] - Z3) < DELTA);
     }
     vector<float> Z2(nY);
-    vector<int> samples2(nY);
+    vector<int_t> samples2(nY);
     aep = AnnEstimatorPermuted<float,LinearScan<float>>(h, kernel, k, m, &ls, seed);
     aep.fit(nX, d, X);
     aep.query(nY, d, Y, &Z2[0], &samples2[0]);
@@ -6507,7 +6543,7 @@ TEST_CASE( "test_ann_estimator_permuted1", "[annestimatorpermuted]" ) {
     aep2.query(nY, d, Y, &Z2[0], &samples2[0]);
     REQUIRE(!array::equal(nY, &samples[0], &samples2[0]));
     REQUIRE(!array::equal(nY, &Z[0], &Z2[0]));
-    for (int i = 0; i < nY; ++i) {
+    for (int_t i = 0; i < nY; ++i) {
       REQUIRE(nX + m <= samples[i]);
       REQUIRE(samples[i] <= 2*nX);
       REQUIRE(nX + m <= samples2[i]);
@@ -6526,7 +6562,7 @@ TEST_CASE( "test_ann_estimator_permuted1", "[annestimatorpermuted]" ) {
     aep2.fit(nX, d, X);
     aep2.query(nY, d, Y, &Z2[0], &samples2[0]);
     REQUIRE(array::equal(nY, &samples[0], &samples2[0]));
-    for (int i = 0; i < nY; ++i) {
+    for (int_t i = 0; i < nY; ++i) {
       // these should be equal but are not because of some MKL weirdness
       // REQUIRE(Z[i] == Z2[i]);
       REQUIRE(std::abs(Z[i] - Z2[i]) < 1e-7f);
@@ -6562,10 +6598,10 @@ TEST_CASE( "test_ann_estimator_permuted1", "[annestimatorpermuted]" ) {
 
 TEST_CASE( "test_ann_estimator_permuted2", "[annestimatorpermuted]" ) {
   double* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   double *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   LinearScan<double> ls(Metric::EUCLIDEAN);
@@ -6577,7 +6613,7 @@ TEST_CASE( "test_ann_estimator_permuted2", "[annestimatorpermuted]" ) {
 
   vector<double> mu(nY);
   vector<double> Z(nY);
-  vector<int> samples(nY);
+  vector<int_t> samples(nY);
 
   REQUIRE_THROWS_AS((AnnEstimatorPermuted<double,LinearScan<double>>
                      (0, Kernel::EXPONENTIAL, 0, 0, &ls)),
@@ -6612,21 +6648,21 @@ TEST_CASE( "test_ann_estimator_permuted2", "[annestimatorpermuted]" ) {
   REQUIRE_THROWS_AS(aep.query(d-1, X, &Z[0]), invalid_argument);
   
   vector<uint32_t> indices(nX);
-  for (int i = 0; i < nX; ++i)
+  for (int_t i = 0; i < nX; ++i)
     indices[i] = i;
   std::mt19937 rng(seed);
   std::shuffle(indices.begin(), indices.end(), rng);
 #ifdef DEANN_ENABLE_DEBUG_ACCESSORS
   REQUIRE(array::equal(nX, &indices[0], aep.getXpermutedIdx()));
   const double* Xp = aep.getXpermuted();
-  for (int i = 0; i < nX; ++i) {
+  for (int_t i = 0; i < nX; ++i) {
     REQUIRE(array::equal(d, X + indices[i]*d, Xp + i*d));
   }
 #endif // DEANN_ENABLE_DEBUG_ACCESSORS
 
   aep.query(nY, d, Y, &Z[0], &samples[0]);
   REQUIRE(array::allEqual(d, &Z[0], 0.0));
-  REQUIRE(array::allEqual(d, &samples[0], 0));
+  REQUIRE(array::allEqual(d, &samples[0], static_cast<int_t>(0)));
   
   RandomSamplingPermuted rsp(h, Kernel::EXPONENTIAL, 1, seed);
   rsp.fit(nX, d, X);
@@ -6638,7 +6674,7 @@ TEST_CASE( "test_ann_estimator_permuted2", "[annestimatorpermuted]" ) {
   const double DELTA = 1e-6f;
   
   for (Kernel kernel : { Kernel::EXPONENTIAL, Kernel::GAUSSIAN }) {
-    const int m = 500;
+    const int_t m = 500;
     aep = AnnEstimatorPermuted<double,LinearScan<double>>(h, kernel, 0, m, &ls, seed);
     aep.fit(nX, d, X);
     rsp = RandomSamplingPermuted(h, kernel, m, seed);
@@ -6649,7 +6685,7 @@ TEST_CASE( "test_ann_estimator_permuted2", "[annestimatorpermuted]" ) {
     aep.query(nY, d, Y, &Z[0], &samples[0]);
     rsp.query(nY, d, Y, &mu[0]);
 
-    for (int i = 0; i < nY; ++i) {
+    for (int_t i = 0; i < nY; ++i) {
       REQUIRE(std::abs(mu[i] - Z[i]) < DELTA);
     }
     
@@ -6663,14 +6699,14 @@ TEST_CASE( "test_ann_estimator_permuted2", "[annestimatorpermuted]" ) {
     aep.query(nY, d, Y, &Z[0], &samples[0]);
     nkde.query(nY, d, Y, &mu[0]);
 
-    for (int i = 0; i < nY; ++i) {
+    for (int_t i = 0; i < nY; ++i) {
       REQUIRE(std::abs(mu[i] - Z[i]) < DELTA);
     }
 
     REQUIRE(array::allEqual(nY, &samples[0], nX));    
     REQUIRE(array::almostEqual(nY, &mu[0], &Z[0], DELTA));
 
-    const int k = 1000;
+    const int_t k = 1000;
     aep = AnnEstimatorPermuted<double,LinearScan<double>>(h, kernel, k, m, &ls, seed);
     aep.fit(nX, d, X);
 
@@ -6680,11 +6716,11 @@ TEST_CASE( "test_ann_estimator_permuted2", "[annestimatorpermuted]" ) {
       else
         return std::exp(-dist*dist/h/h/2);
     };
-    vector<int> nns(k);
+    vector<int_t> nns(k);
     vector<double> dists(k);
     vector<double> scratch(d);
-    int idx = 0;
-    for (int i = 0; i < nY; ++i) {
+    int_t idx = 0;
+    for (int_t i = 0; i < nY; ++i) {
       double* q = Y + i*d;
       ls.query(d, k, q, &nns[0], &dists[0]);
       double Z1 = 0;
@@ -6692,12 +6728,12 @@ TEST_CASE( "test_ann_estimator_permuted2", "[annestimatorpermuted]" ) {
         Z1 += kfun(dist);
 
       double Z2 = 0;
-      int rsCount = 0;
-      int rsSampleCount = 0;
-      int correctionCount = 0;
+      int_t rsCount = 0;
+      int_t rsSampleCount = 0;
+      int_t correctionCount = 0;
       double correctionAmount = 0;
       while (rsCount < m) {
-        int id = indices[idx];
+        int_t id = indices[idx];
         double* x = X + id*d;
         double dist = array::euclideanDistance(d, q, x, &scratch[0]);
         if (std::find(nns.begin(), nns.end(), id) == nns.end()) {
@@ -6721,7 +6757,7 @@ TEST_CASE( "test_ann_estimator_permuted2", "[annestimatorpermuted]" ) {
       REQUIRE(std::abs(Z[i] - Z3) < DELTA);
     }
     vector<double> Z2(nY);
-    vector<int> samples2(nY);
+    vector<int_t> samples2(nY);
     aep = AnnEstimatorPermuted<double,LinearScan<double>>(h, kernel, k, m, &ls, seed);
     aep.fit(nX, d, X);
     aep.query(nY, d, Y, &Z2[0], &samples2[0]);
@@ -6738,7 +6774,7 @@ TEST_CASE( "test_ann_estimator_permuted2", "[annestimatorpermuted]" ) {
     aep2.query(nY, d, Y, &Z2[0], &samples2[0]);
     REQUIRE(!array::equal(nY, &samples[0], &samples2[0]));
     REQUIRE(!array::equal(nY, &Z[0], &Z2[0]));
-    for (int i = 0; i < nY; ++i) {
+    for (int_t i = 0; i < nY; ++i) {
       REQUIRE(nX + m <= samples[i]);
       REQUIRE(samples[i] <= 2*nX);
       REQUIRE(nX + m <= samples2[i]);
@@ -6787,10 +6823,10 @@ TEST_CASE( "test_ann_estimator_permuted2", "[annestimatorpermuted]" ) {
 
 TEST_CASE( "test_vml_mode", "[vmlmode]" ) {
   float* data;
-  int n, d;
+  int_t n, d;
   constructMediumTestSet(&data, &n, &d);
   float *X, *Y;
-  int nX, nY;
+  int_t nX, nY;
   array::splitInHalf(n, d, &nX, &nY, data, &X, &Y);
 
   vector<float> mu(nY);
@@ -6833,6 +6869,1970 @@ TEST_CASE( "test_vml_mode", "[vmlmode]" ) {
   vmlSetMode(oldMode);
   allocator.free(data);
 }
+
+
+
+#ifdef DEANN_TESTS_VERYBIG
+TEST_CASE( "test_verybig1", "[verybig]" ) {
+  int64_t n = (1L << 32);
+  int64_t m = (1L << 2);
+  int64_t d = (1L << 1);
+  int64_t K = 1;
+
+  REQUIRE(n > 0);
+  REQUIRE(m > 0);
+  REQUIRE(d > 0);
+  
+  auto metric = Metric::EUCLIDEAN;
+  LinearScan<double> ls(metric, true, true);
+  int_t l = 0;
+  vector<double> X(n*d);
+  vector<double> Q(m*d);
+  for (int_t i = 0; i < n; ++i) {
+    switch(i%4) {
+    case 0:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = l++;
+      }
+      break;
+    case 1:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = -(l++);
+      }
+      break;
+    case 2:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = (l++)*(1-2*(j%2));
+      }
+      break;
+    case 3:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = (l++)*(-1+2*(j%2));
+      }
+      break;
+    }
+  }
+  l = 0;
+  for (int i = 0; i < m; ++i) {
+    for (int j = 0; j < d; ++j) {
+      Q[i*d+j] = X[l*d+j];
+    }
+    l += n/m;
+  }
+  vector<int_t> N(m);
+  vector<double> D(m);
+  vector<int_t> S(m);
+  
+  ls.fit(n, d, &X[0]);
+  ls.query(m, d, K, &Q[0], &N[0], &D[0], &S[0]);
+
+  vector<double> XSqNorms(n);
+  array::sqNorm(n, d, &X[0], &XSqNorms[0]);
+  vector<double> dists(n*m);
+  vector<double> scratch(m+n);
+  array::euclideanSqDistances(n, m, d, &X[0], &Q[0],
+			      &XSqNorms[0], &dists[0],
+			      &scratch[0]);
+  l = 0;
+  for (int_t i = 0; i < m; ++i) {
+    REQUIRE((N[i] == l ||
+	     ((std::abs(N[i]-l) == 4 ||
+	       std::abs(N[i]-l) == 8 ||
+	       std::abs(N[i]-l) == 16 ||
+	       std::abs(N[i]-l) == 32) &&
+	      dists[i*n+l] == 0 &&
+	      dists[i*n+N[i]] == 0)));
+    REQUIRE(D[i] == 0);
+    REQUIRE(S[i] == n);
+    l += n/m;
+  }
+}
+
+
+
+TEST_CASE( "test_verybig2", "[verybig]" ) {
+  int64_t n = (1L << 32);
+  int64_t m = (1L << 4);
+  int64_t d = (1L << 1);
+  int64_t K = 1;
+ 
+  auto metric = Metric::EUCLIDEAN;
+  LinearScan<double> ls(metric, true, true);
+  int_t l = 0;
+  vector<double> X(n*d);
+  vector<double> Q(m*d);
+  for (int_t i = 0; i < n; ++i) {
+    for (int_t j = 0; j < d; ++j) {
+      X[l] = l;
+      ++l;
+    }
+  }
+  l = 0;
+  for (int_t i = 0; i < m; ++i) {
+    for (int_t j = 0; j < d; ++j) {
+      Q[i*d+j] = X[l*d+j];
+    }
+    l += n/m;
+  }
+  vector<int_t> N(m);
+  vector<double> D(m);
+  vector<int_t> S(m);
+  
+  ls.fit(n, d, &X[0]);
+  for (int_t i = 0; i < m; ++i) 
+    ls.query(d, K, &Q[i*d], &N[i], &D[i], &S[i]);
+
+  vector<double> XSqNorms(n);
+  array::sqNorm(n, d, &X[0], &XSqNorms[0]);
+  vector<double> dists(n);
+  vector<double> scratch(1+n);
+
+  l = 0;
+  for (int_t i = 0; i < m; ++i) {
+    if (N[i] != l) {
+      array::euclideanSqDistances(n, 1, d, &X[0], &Q[i*d],
+				  &XSqNorms[0], &dists[0],
+				  &scratch[0]);
+    }
+    REQUIRE((N[i] == l ||
+	    ((std::abs(N[i]-l) == 1 ||
+	      std::abs(N[i]-l)) &&
+	      dists[N[i]] == 0 && dists[l] == 0)));
+    REQUIRE(D[i] == 0);
+    REQUIRE(S[i] == n);
+    l += n/m;
+  }
+}
+
+
+
+TEST_CASE( "test_verybig3", "[verybig]" ) {
+  int64_t n = (1L << 6);
+  int64_t m = (1L << 31);
+  int64_t d = (1L << 1);
+  int64_t K = 1;
+
+  REQUIRE(n > 0);
+  REQUIRE(m > 0);
+  REQUIRE(d > 0);
+  REQUIRE(m >= n);
+  
+  auto metric = Metric::EUCLIDEAN;
+  LinearScan<float> ls(metric, true, true);
+  int_t l = 0;
+  vector<float> X(n*d);
+  vector<float> Q(m*d);
+  for (int_t i = 0; i < n; ++i) {
+    switch(i%4) {
+    case 0:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = l++;
+      }
+      break;
+    case 1:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = -(l++);
+      }
+      break;
+    case 2:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = (l++)*(1-2*(j%2));
+      }
+      break;
+    case 3:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = (l++)*(-1+2*(j%2));
+      }
+      break;
+    }
+  }
+  l = 0;
+  for (int i = 0; i < m; ++i) {
+    l = i % n;
+    for (int j = 0; j < d; ++j) {
+      Q[i*d+j] = X[l*d+j];
+    }
+  }
+  vector<int_t> N(m);
+  vector<float> D(m);
+  vector<int_t> S(m);
+  
+  ls.fit(n, d, &X[0]);
+  ls.query(m, d, K, &Q[0], &N[0], &D[0], &S[0]);
+
+  l = 0;
+  for (int_t i = 0; i < m; ++i) {
+    l = i % n;
+    REQUIRE((N[i] == l));
+    REQUIRE(D[i] == 0);
+    REQUIRE(S[i] == n);
+  }
+}
+
+
+
+TEST_CASE( "test_verybig4", "[verybig]" ) {
+  int64_t n = (1L << 1);
+  int64_t m = (1L << 31);
+  int64_t d = (1L << 1);
+  int64_t K = 1;
+
+  REQUIRE(n > 0);
+  REQUIRE(m > 0);
+  REQUIRE(d > 0);
+  REQUIRE(m >= n);
+  
+  auto metric = Metric::EUCLIDEAN;
+  LinearScan<float> ls(metric, true, true);
+  int_t l = 0;
+  vector<float> X(n*d);
+  vector<float> Q(m*d);
+  for (int_t i = 0; i < n; ++i) {
+    switch(i%4) {
+    case 0:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = l++;
+      }
+      break;
+    case 1:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = -(l++);
+      }
+      break;
+    case 2:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = (l++)*(1-2*(j%2));
+      }
+      break;
+    case 3:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = (l++)*(-1+2*(j%2));
+      }
+      break;
+    }
+  }
+  l = 0;
+  for (int i = 0; i < m; ++i) {
+    l = i % n;
+    for (int j = 0; j < d; ++j) {
+      Q[i*d+j] = X[l*d+j];
+    }
+  }
+  vector<int_t> N(m);
+  vector<float> D(m);
+  vector<int_t> S(m);
+  
+  ls.fit(n, d, &X[0]);
+  for (int_t i = 0; i < m; ++i) {
+    ls.query(d, K, &Q[i*d], &N[i], &D[i], &S[i]);
+  }
+
+  l = 0;
+  for (int_t i = 0; i < m; ++i) {
+    l = i % n;
+    REQUIRE((N[i] == l));
+    REQUIRE(D[i] == 0);
+    REQUIRE(S[i] == n);
+  }
+}
+
+
+
+TEST_CASE( "test_verybig5", "[verybig]" ) {
+  int64_t n = (1L << 2);
+  int64_t m = (1L << 2);
+  int64_t d = (1L << 31);
+  int64_t K = 1;
+
+  REQUIRE(n > 0);
+  REQUIRE(m > 0);
+  REQUIRE(d > 0);
+  REQUIRE(m == n);
+  
+  auto metric = Metric::EUCLIDEAN;
+  LinearScan<double> ls(metric, true, true);
+  int_t l = 0;
+  vector<double> X(n*d);
+  vector<double> Q(m*d);
+  for (int_t i = 0; i < n; ++i) {
+    switch(i%4) {
+    case 0:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = l++;
+      }
+      break;
+    case 1:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = -(l++);
+      }
+      break;
+    case 2:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = (l++)*(1-2*(j%2));
+      }
+      break;
+    case 3:
+      for (int j = 0; j < d; ++j) {
+	X[i*d+j] = (l++)*(-1+2*(j%2));
+      }
+      break;
+    }
+  }
+  for (int i = 0; i < m; ++i) {
+    for (int j = 0; j < d; ++j) {
+      Q[i*d+j] = X[i*d+j];
+    }
+  }
+  vector<int_t> N(m);
+  vector<double> D(m);
+  vector<int_t> S(m);
+  
+  ls.fit(n, d, &X[0]);
+  ls.query(m, d, K, &Q[0], &N[0], &D[0], &S[0]);
+
+  vector<double> XSqNorms(n);
+  array::sqNorm(n, d, &X[0], &XSqNorms[0]);
+  vector<double> dists(n*m);
+  vector<double> scratch(m+n);
+  array::euclideanSqDistances(n, m, d, &X[0], &Q[0],
+			      &XSqNorms[0], &dists[0],
+			      &scratch[0]);
+  
+  for (int_t i = 0; i < m; ++i) {
+    REQUIRE((N[i] == i));
+    REQUIRE(D[i] == Approx(sqrt(dists[i*n+i])).epsilon(1e-11));
+    REQUIRE(S[i] == n);
+  }
+}
+
+
+
+TEST_CASE( "test_verybig6", "[verybig]" ) {
+  const int64_t n = (1L << 32);
+  const int64_t m = (1L << 2);
+  const int64_t d = (1L << 1);
+  const double h = 1;
+  vector<double> X(n*d);
+  int_t l = 0;
+  for (int_t i = 0; i < m; ++i) {
+    for (int_t j = 0; j < n/m; ++j) {
+      for (int_t k = 0; k < d; ++k) {
+	X[l++] = i*(n/m);
+      }
+    }
+  }
+  vector<double> Q(m*d);
+  for (int_t i = 0; i < m; ++i) {
+    for (int_t j = 0; j < d; ++j) {
+      Q[i*d+j] = i*(n/m);
+    }
+  }
+    
+  vector<double> Z(m);
+  vector<int_t> samples(m);
+  NaiveKde<double> nkde(h, Kernel::GAUSSIAN);
+  nkde.fit(n, d, &X[0]);
+  nkde.query(m, d, &Q[0], &Z[0], &samples[0]);
+  for (int_t i = 0; i < m; ++i) {
+    REQUIRE(Z[i] == 1.0/m);
+    REQUIRE(samples[i] == n);
+  }
+}
+
+
+
+TEST_CASE( "test_verybig7", "[verybig]" ) {
+  const int64_t n = (1L << 2);
+  const int64_t m = (1L << 32);
+  const int64_t d = (1L << 1);
+  const double h = 1;
+  REQUIRE(m > n);
+  vector<double> X(n*d);
+  int_t l = 0;
+  for (int_t i = 0; i < n; ++i) {
+    for (int_t j = 0; j < d; ++j) {
+      X[l++] = i*(m/n);
+    }
+  }
+  
+  vector<double> Q(m*d);
+  l = 0;
+  for (int_t i = 0; i < n; ++i) {
+    for (int_t j = 0; j < m/n; ++j) {
+      for (int_t k = 0; k < d; ++k) {
+	Q[l++] = i*(m/n);
+      }
+    }
+  }
+    
+  vector<double> Z(m);
+  vector<int_t> samples(m);
+  NaiveKde<double> nkde(h, Kernel::GAUSSIAN);
+  nkde.fit(n, d, &X[0]);
+  nkde.query(m, d, &Q[0], &Z[0], &samples[0]);
+  for (int_t i = 0; i < m; ++i) {
+    REQUIRE(Z[i] == 1.0/n);
+    REQUIRE(samples[i] == n);
+  }
+}
+
+
+
+TEST_CASE( "test_verybig8", "[verybig]" ) {
+  const int64_t n = (1L << 2);
+  const int64_t m = (1L << 2);
+  const int64_t d = (1L << 32);
+  const double h = 1;
+  REQUIRE(m == n);
+  vector<double> X(n*d);
+  int_t l = 0;
+  for (int_t i = 0; i < n; ++i) {
+    for (int_t j = 0; j < d; ++j) {
+      X[l++] = i*d;
+    }
+  }
+  
+  vector<double> Q(m*d);
+  l = 0;
+  for (int_t i = 0; i < m; ++i) {
+    for (int_t j = 0; j < d; ++j) {
+      Q[l++] = i*d;
+    }
+  }
+    
+  vector<double> Z(m);
+  vector<int_t> samples(m);
+  NaiveKde<double> nkde(h, Kernel::GAUSSIAN);
+  nkde.fit(n, d, &X[0]);
+  nkde.query(m, d, &Q[0], &Z[0], &samples[0]);
+  for (int_t i = 0; i < m; ++i) {
+    REQUIRE(Z[i] == 1.0/n);
+    REQUIRE(samples[i] == n);
+  }
+}
+
+
+
+TEST_CASE( "test_verybig9", "[verybig]" ) {
+  const int_t n = (1ll<<28);
+  const uint32_t SEED = 0x12345678;
+  
+  REQUIRE_THROWS_AS(FastRng32(0),
+		    std::invalid_argument);
+  
+  for (uint64_t m : {
+      3ul, 8ul, 199ul, 48242ul, 
+      12508900ul, 
+      1393779420ul,
+    }) {
+    
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    FastRng32 rng(m,SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "RNG initialization with n=" << n << " and m="
+       << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+    vector<uint32_t> X(n);
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    rng(n,&X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "generating " << n << " random numbers took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    vector<int_t> histogram(m,0);
+    int_t count = 0;
+    uint64_t min_val = UINT64_MAX;
+    uint64_t max_val = 0;
+    for (uint64_t x : X) {
+      REQUIRE(x < m);
+      ++histogram[x];
+      ++count;
+      min_val = std::min(min_val,x);
+      max_val = std::max(max_val,x);
+    }
+    REQUIRE(count == n);
+    REQUIRE(min_val == 0);
+    if (m < (1<<24)) {
+      REQUIRE(max_val == m-1);
+    }
+    else {
+      REQUIRE(max_val >= m-10);
+    }
+    double mean = 0.0;
+    int_t sum = 0.0;
+    for (uint64_t i = 0; i < m; ++i) {
+      mean += 1.0 * histogram[i] / n * i;
+      sum += histogram[i];
+      if (m < (1<<16)) {
+	REQUIRE_THAT(histogram[i], WithinRel(1.0*n/m,0.001));
+      }
+      else if (m < (1<<24)) {
+	REQUIRE_THAT(histogram[i], WithinRel(1.0*n/m,0.3));
+      }
+      else {
+	REQUIRE(histogram[i] <= 3);
+      }
+    }
+    REQUIRE(sum == n);
+    REQUIRE_THAT(mean, WithinRel((m-1)*0.5,1e-4));
+  }
+}
+
+
+
+TEST_CASE( "test_verybig10", "[verybig]" ) {
+  const int_t n = (1ll<<28);
+  const uint32_t SEED = 0x12345678;
+
+  for (uint64_t m : {
+      3ul, 8ul, 199ul, 48242ul, 
+      12508900ul, 
+      1393779420ul, 
+      22196120240622ul, 
+      8388396786567424331ul,
+      9388396786567424331ul,
+    }) {
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    FastRng128 rng(m,SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "RNG initialization with n=" << n << " and m="
+       << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+    vector<uint64_t> X(n);
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    rng(n,&X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "generating " << n << " random numbers took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    if (m < (1ul << 32)) {
+      vector<int_t> histogram(m,0);
+      int_t count = 0;
+      uint64_t min_val = UINT64_MAX;
+      uint64_t max_val = 0;
+      for (uint64_t x : X) {
+	REQUIRE(x < m);
+	++histogram[x];
+	++count;
+	min_val = std::min(min_val,x);
+	max_val = std::max(max_val,x);
+      }
+      REQUIRE(count == n);
+      if (m <= (1 << 24)) {
+	REQUIRE(min_val == 0);
+	REQUIRE(max_val == m-1);
+      }
+      else {
+       	REQUIRE(min_val <= 5);
+	REQUIRE(max_val >= m-5);
+      }
+      double mean = 0.0;
+      int_t sum = 0.0;
+      for (uint64_t i = 0; i < m; ++i) {
+	mean += 1.0 * histogram[i] / n * i;
+	sum += histogram[i];
+	if (m < (1<<16)) {
+	  REQUIRE_THAT(histogram[i], WithinRel(1.0*n/m,0.001));
+	}
+	else if (m < (1<<24)) {
+	  REQUIRE_THAT(histogram[i], WithinRel(1.0*n/m,0.1));
+	}
+	else {
+	  REQUIRE(histogram[i] <= 3);
+	}
+      }
+      REQUIRE(sum == n);
+      REQUIRE_THAT(mean, WithinRel((m-1)*0.5,1e-4));
+    }
+    else {
+      int_t count = 0;
+      uint64_t min_val = UINT64_MAX;
+      uint64_t max_val = 0;
+      for (uint64_t x : X) {
+	REQUIRE(x < m);
+	++count;
+	min_val = std::min(min_val,x);
+	max_val = std::max(max_val,x);
+      }
+      REQUIRE(count == n);
+      if (m < (1ul << 62)) {
+	REQUIRE(min_val <= 70000);
+	REQUIRE(max_val >= m-70000);
+      }
+      else {
+	REQUIRE(min_val <= 1e11);
+	REQUIRE(max_val >= m-1e11);
+      }
+    }
+  }
+}
+
+
+
+TEST_CASE( "test_verybig11", "[verybig]" ) {
+  const int_t nX = (1ll << 32);
+  const int_t nY = (1ll << 2);
+  const int_t d = (1l << 1);
+  const uint32_t SEED = 0x12345678;
+  const double h = 1;
+  Kernel K = Kernel::GAUSSIAN;
+
+  REQUIRE(nX >= nY);
+  REQUIRE(nX % nY == 0);
+
+  REQUIRE_THROWS_AS(RandomSampling<double>(h,K,0),
+		    std::invalid_argument);
+  
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    vector<double> X(nX*d);
+    vector<double> Q(nY*d);
+    vector<double> Z(nY);
+    vector<int_t> samples(nY);
+    vector<double> mu(nY);
+
+    int_t l = 0;
+    for (int_t i = 0; i < nY; ++i) {
+      for (int_t j = 0; j < nX/nY; ++j) {
+	for (int_t k = 0; k < d; ++k) {
+	  X[l++] = i*(nX/nY);
+	}
+      }
+    }
+    l = 0;
+    for (int_t i = 0; i < nY; ++i) {
+      for (int_t k = 0; k < d; ++k) {
+	Q[l++] = i*(nX/nY);
+      }
+    }
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "Data generation with nX=" << nX << " and nY="
+       << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+    for (int_t m : {
+	static_cast<int_t>(1),
+	static_cast<int_t>(2),
+	nX/(1l << 10), nX/2,
+	nX
+    }) {
+      REQUIRE(m <= nX);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      RandomSampling rs(h, K, m, SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      auto diff = timerOff();
+      cerr << "RS initialization with m="
+	   << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      rs.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "RS fitting with nX=" << nX << " and d=" << d << " took "
+	 << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    rs.query(nY, d, &Q[0], &Z[0], &samples[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "RS query with nY=" << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+    for (int_t i = 0; i < nY; ++i) {
+      if (m == 1) {
+	REQUIRE((Z[i] == 1.0 || Z[i] == 0.0));
+      }
+      else if (m == 2) {
+	REQUIRE((Z[i] == 0.0 || Z[i] == 0.5 || Z[i] == 1.0));
+      }
+      else if (m < nX) {
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,0.1));
+      }
+      else {
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,0.05));
+      }
+      REQUIRE(samples[i] == m);
+    }
+  }
+}
+
+
+
+TEST_CASE( "test_verybig12", "[verybig]" ) {
+  const int_t nX = (1ll << 3);
+  const int_t nY = (1ll << 31);
+  const int_t d = (1l << 1);
+  const uint32_t SEED = 0x12345678;
+  const double h = 1;
+  Kernel K = Kernel::GAUSSIAN;
+
+  REQUIRE(nY >= nX);
+  REQUIRE(nY % nX == 0);
+
+  REQUIRE_THROWS_AS(RandomSampling<double>(h,K,0),
+		    std::invalid_argument);
+  
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    vector<double> X(nX*d);
+    vector<double> Q(nY*d);
+    vector<double> Z(nY);
+    vector<int_t> samples(nY);
+    vector<double> mu(nY);
+
+    int_t l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int_t j = 0; j < d; ++j) {
+	X[l++] = i*(nY/nX);
+      }
+    }
+    l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int j = 0; j < nY/nX; ++j) {
+	for (int_t k = 0; k < d; ++k) {
+	  Q[l++] = i*(nY/nX);
+	}
+      }
+    }
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "Data generation with nX=" << nX << " and nY="
+       << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+  REQUIRE(nX >= 8);
+  for (int_t m : { nX/8, nX/4, nX/2, nX }) {
+      REQUIRE(m <= nX);
+      REQUIRE(nX % m == 0);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      RandomSampling rs(h, K, m, SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      auto diff = timerOff();
+      cerr << "RS initialization with m="
+	   << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      rs.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "RS fitting with nX=" << nX << " and d=" << d << " took "
+	 << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    rs.query(nY, d, &Q[0], &Z[0], &samples[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "RS query with nY=" << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+    double avg = 0.0;
+    for (int_t i = 0; i < nY; ++i) {
+      avg += Z[i];
+      if (m == 1) {
+	REQUIRE((Z[i] == 1.0 || Z[i] == 0.0));
+      }
+      else if (m <= 1024) {
+	REQUIRE(((Z[i] == 0.0) || (Z[i] == 1.0) ||
+		 (Z[i]-static_cast<int>(Z[i]*m)*1.0/m == 0)));
+      }
+      else if (m < nX) {
+	fprintf(stderr, "%s:%d %f\n",
+		__FILE__, __LINE__, Z[i]);
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nX,0.1));
+      }
+      else {
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nX,0.05));
+      }
+      REQUIRE(samples[i] == m);
+    }
+    avg /= nY;
+    /*if (m == 1) {
+      REQUIRE(avg == 1.0/nX);
+      // REQUIRE(avg == 0.0);
+    }
+    else */
+    if (m <= 1024) {
+      REQUIRE_THAT(avg, WithinRel(1.0/nX,0.02));
+    }
+    else {
+      REQUIRE(avg == 1.0/nX);
+    }
+  }
+}
+
+
+
+TEST_CASE( "test_verybig13", "[verybig]" ) {
+  const int_t nX = (1ll << 2);
+  const int_t nY = (1ll << 2);
+  const int_t d = (1ll << 32);
+  const uint32_t SEED = 0x12345678;
+  const double h = 1;
+  Kernel K = Kernel::GAUSSIAN;
+
+  REQUIRE(nY == nX);
+  REQUIRE(d >= nX);
+  REQUIRE(d % nX == 0);
+
+  REQUIRE_THROWS_AS(RandomSampling<double>(h,K,0),
+		    std::invalid_argument);
+  
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    vector<double> X(nX*d);
+    vector<double> Q(nY*d);
+    vector<double> Z(nY);
+    vector<int_t> samples(nY);
+    vector<double> mu(nY);
+
+    int_t l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int_t j = 0; j < d; ++j) {
+	X[l++] = 128*i;
+      }
+    }
+    l = 0;
+    for (int_t i = 0; i < nY; ++i) {
+      for (int_t j = 0; j < d; ++j) {
+	Q[l++] = 128*i;
+      }
+    }
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "Data generation with nX=" << nX << " and nY="
+       << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+  REQUIRE(nX >= 4);
+  for (int_t m : { nX/4, nX/2, nX }) {
+      REQUIRE(m <= nX);
+      REQUIRE(nX % m == 0);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      RandomSampling rs(h, K, m, SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      auto diff = timerOff();
+      cerr << "RS initialization with m="
+	   << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      rs.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "RS fitting with nX=" << nX << " and d=" << d << " took "
+	 << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    rs.query(nY, d, &Q[0], &Z[0], &samples[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "RS query with nY=" << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+    double avg = 0.0;
+    for (int_t i = 0; i < nY; ++i) {
+      avg += Z[i];
+      if (m == 1) {
+	REQUIRE((Z[i] == 1.0 || Z[i] == 0.0));
+      }
+      else if (m <= 1024) {
+	REQUIRE(((Z[i] == 0.0) || (Z[i] == 1.0) ||
+		 (Z[i]-static_cast<int>(Z[i]*m)*1.0/m == 0)));
+      }
+      else if (m < nX) {
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nX,0.1));
+      }
+      else {
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nX,0.05));
+      }
+      REQUIRE(samples[i] == m);
+    }
+    avg /= nY;
+    fprintf(stderr, "%s:%d m=%lld avg=%f\n",
+	    __FILE__, __LINE__, m, avg);
+    if (m <= 2) {
+      REQUIRE_THAT(avg, WithinRel(1.0/nX,0.5));
+    }
+    else if (m <= 4) {
+      REQUIRE_THAT(avg, WithinRel(1.0/nX,0.25));
+    }
+    else if (m <= 16) {
+      REQUIRE_THAT(avg, WithinRel(1.0/nX,0.2));
+    }
+    else if (m <= 1024) {
+      REQUIRE_THAT(avg, WithinRel(1.0/nX,0.02));
+    }
+    else {
+      REQUIRE(avg == 1.0/nX);
+    }
+  }
+}
+
+
+
+TEST_CASE( "test_verybig14", "[verybig]" ) {
+  const int_t nX = (1ll << 31);
+  const int_t nY = (1ll << 1);
+  const int_t d = (1l << 1);
+  const uint32_t SEED = 0x12345678;
+  const double h = 1;
+  Kernel K = Kernel::GAUSSIAN;
+
+  REQUIRE(nX >= nY);
+  REQUIRE(nX % nY == 0);
+
+  REQUIRE_THROWS_AS(RandomSamplingPermuted<double>(h,K,0),
+		    std::invalid_argument);
+  
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    vector<double> X(nX*d);
+    vector<double> Q(nY*d);
+    vector<double> Z(nY);
+    vector<int_t> samples(nY);
+    vector<double> mu(nY);
+
+    int_t l = 0;
+    for (int_t i = 0; i < nY; ++i) {
+      for (int_t j = 0; j < nX/nY; ++j) {
+	for (int_t k = 0; k < d; ++k) {
+	  X[l++] = i*(nX/nY);
+	}
+      }
+    }
+    l = 0;
+    for (int_t i = 0; i < nY; ++i) {
+      for (int_t k = 0; k < d; ++k) {
+	Q[l++] = i*(nX/nY);
+      }
+    }
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "Data generation with nX=" << nX << " and nY="
+       << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+  REQUIRE(nX >= 4096);
+  REQUIRE(nX/1024 > 2);
+  for (int_t m : {
+      static_cast<int_t>(1),
+      static_cast<int_t>(2),
+      nX/(1l << 10), nX/2,
+      nX
+    }) {
+      REQUIRE(m <= nX);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      RandomSamplingPermuted rsp(h, K, m, SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      auto diff = timerOff();
+      cerr << "RSP initialization with m="
+	   << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      rsp.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "RSP fitting with nX=" << nX << " and d=" << d << " took "
+	 << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    rsp.query(nY, d, &Q[0], &Z[0], &samples[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "RSP query with nY=" << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+    for (int_t i = 0; i < nY; ++i) {
+      if (m == 1) {
+	REQUIRE((Z[i] == 1.0 || Z[i] == 0.0));
+      }
+      else if (m == 2) {
+	REQUIRE((Z[i] == 0.0 || Z[i] == 0.5 || Z[i] == 1.0));
+      }
+      else if (m < nX/2) {
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,0.5));
+      }
+      else if (m < nX) {
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,0.01));
+      }
+      else {
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,0.005));
+      }
+      REQUIRE(samples[i] == m);
+    }
+  }
+}
+
+
+
+TEST_CASE( "test_verybig15", "[verybig]" ) {
+  const int_t nX = (1ll << 1);
+  const int_t nY = (1ll << 31);
+  const int_t d = (1l << 1);
+  const uint32_t SEED = 0x12345678;
+  const double h = 1;
+  Kernel K = Kernel::GAUSSIAN;
+
+  REQUIRE(nY >= nX);
+  REQUIRE(nY % nX == 0);
+
+  REQUIRE_THROWS_AS(RandomSamplingPermuted<double>(h,K,0),
+		    std::invalid_argument);
+  
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    vector<double> X(nX*d);
+    vector<double> Q(nY*d);
+    vector<double> Z(nY);
+    vector<int_t> samples(nY);
+
+    int_t l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int_t j = 0; j < d; ++j) {
+	X[l++] = i*128;
+      }
+    }
+    l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int_t j = 0; j < nY/nX; ++j) {
+	for (int_t k = 0; k < d; ++k) {
+	  Q[l++] = i*128;
+	}
+      }
+    }
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "Data generation with nX=" << nX << " and nY="
+       << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+  REQUIRE(nX/2 >= 1);
+  for (int_t m : {
+      nX/2, nX
+    }) {
+      REQUIRE(m <= nX);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      RandomSamplingPermuted rsp(h, K, m, SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      auto diff = timerOff();
+      cerr << "RSP initialization with m="
+	   << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      rsp.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "RSP fitting with nX=" << nX << " and d=" << d << " took "
+	 << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    rsp.query(nY, d, &Q[0], &Z[0], &samples[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "RSP query with nY=" << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    double avg = 0.0;
+    for (int_t i = 0; i < nY; ++i) {
+      avg += Z[i];
+      if (m <= nX/2) {
+	REQUIRE(Z[i] - static_cast<int>(Z[i]*m)*1.0/m
+		< 1e-20);
+      }
+      else {
+	REQUIRE(Z[i] == 1.0/nX);
+      }
+      REQUIRE(samples[i] == m);
+    }
+    avg /= nY;
+    if (m == nX) {
+      REQUIRE(avg == 1.0/nX);
+    }
+    else if (m <= 256) {
+      REQUIRE_THAT(avg,WithinRel(1.0/nX,0.05));
+    }
+    else if (m <= 512) {
+      REQUIRE_THAT(avg,WithinRel(1.0/nX,0.01));
+    }
+    else {
+      REQUIRE(avg == 1.0/nX);
+    }
+  }
+}
+
+
+
+TEST_CASE( "test_verybig16", "[verybig]" ) {
+  const int_t nX = (1ll << 3);
+  const int_t nY = (1ll << 3);
+  const int_t d = (1l << 31);
+  const uint32_t SEED = 0x12345678;
+  const double h = 1;
+  Kernel K = Kernel::GAUSSIAN;
+
+  REQUIRE(nY == nX);
+  REQUIRE(d >= nX);
+  REQUIRE(d % nX == 0);
+
+  REQUIRE_THROWS_AS(RandomSamplingPermuted<double>(h,K,0),
+		    std::invalid_argument);
+  
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    vector<double> X(nX*d);
+    vector<double> Q(nY*d);
+    vector<double> Z(nY);
+    vector<int_t> samples(nY);
+
+    int_t l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int_t j = 0; j < d; ++j) {
+	X[l++] = i*128;
+      }
+    }
+    l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int_t j = 0; j < nY/nX; ++j) {
+	for (int_t k = 0; k < d; ++k) {
+	  Q[l++] = i*128;
+	}
+      }
+    }
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "Data generation with nX=" << nX << " and nY="
+       << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+  REQUIRE(nX/2 >= 1);
+  for (int_t m : {
+      nX/2, nX
+    }) {
+    REQUIRE(m <= nX);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    RandomSamplingPermuted rsp(h, K, m, SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    auto diff = timerOff();
+    cerr << "RSP initialization with m="
+	 << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    rsp.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "RSP fitting with nX=" << nX << " and d=" << d << " took "
+	 << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    rsp.query(nY, d, &Q[0], &Z[0], &samples[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "RSP query with nY=" << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    double avg = 0.0;
+    for (int_t i = 0; i < nY; ++i) {
+      avg += Z[i];
+      if (m <= nX/2) {
+	REQUIRE(Z[i] - static_cast<int>(Z[i]*m)*1.0/m
+		< 1e-20);
+      }
+      else {
+	REQUIRE(Z[i] == 1.0/nX);
+      }
+      REQUIRE(samples[i] == m);
+    }
+    avg /= nY;
+    if (m == nX) {
+      REQUIRE(avg == 1.0/nX);
+    }
+    else if (m <= 256) {
+      REQUIRE_THAT(avg,WithinRel(1.0/nX,0.05));
+    }
+    else if (m <= 512) {
+      REQUIRE_THAT(avg,WithinRel(1.0/nX,0.01));
+    }
+    else {
+      REQUIRE(avg == 1.0/nX);
+    }
+  }
+}
+
+
+
+TEST_CASE( "test_verybig17", "[verybig]" ) {
+  const int_t nX = (1ll << 32);
+  const int_t nY = (1ll << 1);
+  const int_t d = (1l << 1);
+  const uint32_t SEED = 0x12345678;
+  const double h = 1;
+  Kernel K = Kernel::GAUSSIAN;
+  
+  REQUIRE(nX >= nY);
+  REQUIRE(nX % nY == 0);
+
+ 
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+  vector<double> X(nX*d);
+  vector<double> Q(nY*d);
+  vector<double> Z(nY);
+  vector<int_t> samples(nY);
+  
+  int_t l = 0;
+  for (int_t i = 0; i < nY; ++i) {
+    for (int_t j = 0; j < nX/nY; ++j) {
+      for (int_t k = 0; k < d; ++k) {
+	X[l++] = i*(nX/nY);
+      }
+    }
+  }
+  l = 0;
+  for (int_t i = 0; i < nY; ++i) {
+    for (int_t k = 0; k < d; ++k) {
+      Q[l++] = i*(nX/nY);
+    }
+  }
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "Data generation with nX=" << nX << " and nY="
+       << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+  LinearScan<double> ls(Metric::EUCLIDEAN);
+  ls.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  diff = timerOff();
+  cerr << "Linear scan construction with nX=" << nX << " and d="
+       << d << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+  REQUIRE(nX/2 >= 1);
+  for (auto [k,m] : { make_pair(nX,0ll), make_pair(0ll,nX),
+		     /* make_pair(nX/2,nX/2), */ }) {
+    REQUIRE(k <= nX);
+    REQUIRE(m <= nX);
+    REQUIRE(k+m <= nX);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    AnnEstimator<double,LinearScan<double>> ann(h, K, k, m, &ls, SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    auto diff = timerOff();
+    cerr << "ANN initialization with k=" << k << ", m="
+	 << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    ann.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "ANN fitting with nX=" << nX << " and d=" << d << " took "
+	 << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    ann.query(nY, d, &Q[0], &Z[0], &samples[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "ANN query with nY=" << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+    for (int_t i = 0; i < nY; ++i) {
+      if (k == nX) 
+	REQUIRE(Z[i] == 1.0/nY);
+      else if (nX <= 1024)
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,0.2));
+      else if (nX <= 65536)
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,0.1));
+      else if (nX <= 1048576)
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,0.01));
+      else if (nX <= 16777216)
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,0.001));
+      else if (nX <= 268435456)
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,0.0001));	
+      else if (nX <= 4294967296)
+	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,0.00001));	
+      else
+	REQUIRE(Z[i] == 1.0/nY);
+      if (k == 0)
+	REQUIRE(samples[i] == m);
+      else
+	REQUIRE(samples[i] == nX + m);
+    }
+  }
+}
+
+
+
+TEST_CASE( "test_verybig18", "[verybig]" ) {
+  const int_t nX = (1ll << 1);
+  const int_t nY = (1ll << 31);
+  const int_t d = (1l << 1);
+  const uint32_t SEED = 0x12345678;
+  const double h = 1;
+  Kernel K = Kernel::GAUSSIAN;
+
+  REQUIRE(nY >= nX);
+  REQUIRE(nY % nX == 0);
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    vector<double> X(nX*d);
+    vector<double> Q(nY*d);
+    vector<double> Z(nY);
+    vector<int_t> samples(nY);
+
+    int_t l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int_t j = 0; j < d; ++j) {
+	X[l++] = i*128;
+      }
+    }
+    l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int_t j = 0; j < nY/nX; ++j) {
+	for (int_t k = 0; k < d; ++k) {
+	  Q[l++] = i*128;
+	}
+      }
+    }
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "Data generation with nX=" << nX << " and nY="
+       << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+  LinearScan<double> ls(Metric::EUCLIDEAN);
+  ls.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  diff = timerOff();
+  cerr << "Linear scan construction with nX=" << nX << " and d="
+       << d << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+  
+  REQUIRE(nX/2 >= 1);
+  for (auto [k,m] : {
+      make_pair(nX,0ll), make_pair(0ll, nX),
+      make_pair(nX/2,nX/2)
+    }) {
+      REQUIRE(m <= nX);
+      REQUIRE(k <= nX);
+      REQUIRE(m+k <= nX);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      AnnEstimator<double,LinearScan<double>> ann(h, K, k, m, &ls, SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      auto diff = timerOff();
+      cerr << "ANN initialization with k=" << k << " and m="
+	   << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      ann.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "ANN fitting with nX=" << nX << " and d=" << d << " took "
+	 << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    ann.query(nY, d, &Q[0], &Z[0], &samples[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "ANN query with nY=" << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    double avg = 0.0;
+    for (int_t i = 0; i < nY; ++i) {
+      avg += Z[i];
+      if (m == nX) {
+	// fprintf(stderr, "%s:%d Z[i]=%f\n",
+	// 	__FILE__, __LINE__, Z[i]);
+	REQUIRE(Z[i] - static_cast<int>(Z[i]*m)*1.0/m == 0);
+      }
+      else {
+	REQUIRE(Z[i] == 1.0/nX);
+      }
+      if (k == 0) {
+	REQUIRE(samples[i] == m);
+      }
+      else {
+	REQUIRE(samples[i] == nX+m);
+      }
+    }
+    avg /= nY;
+    if (k == 0 && m <= nX) {
+      REQUIRE_THAT(avg,WithinRel(1.0/nX,0.02));
+    }
+    else {
+      REQUIRE(avg == 1.0/nX);
+    }
+  }
+}
+
+
+
+TEST_CASE( "test_verybig19", "[verybig]" ) {
+  const int_t nX = (1ll << 1);
+  const int_t nY = (1ll << 1);
+  const int_t d = (1l << 32);
+  const uint32_t SEED = 0x12345678;
+  const double h = 1;
+  Kernel K = Kernel::GAUSSIAN;
+
+  REQUIRE(nY == nX);
+  REQUIRE(d >= nX);
+  REQUIRE(d % nX == 0);
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    vector<double> X(nX*d);
+    vector<double> Q(nY*d);
+    vector<double> Z(nY);
+    vector<int_t> samples(nY);
+
+    int_t l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int_t j = 0; j < d; ++j) {
+	X[l++] = i*(d/nX);
+      }
+    }
+    l = 0;
+    for (int_t i = 0; i < nY; ++i) {
+      for (int_t j = 0; j < d; ++j) {
+	Q[l++] = i*(d/nX);
+      }
+    }
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "Data generation with nX=" << nX << " and nY="
+       << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+  LinearScan<double> ls(Metric::EUCLIDEAN);
+  ls.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  diff = timerOff();
+  cerr << "Linear scan construction with nX=" << nX << " and d="
+       << d << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+  
+  REQUIRE(nX/2 >= 1);
+  for (auto [k,m] : {
+      make_pair(nX,0ll), make_pair(0ll, nX),
+      make_pair(nX/2,nX/2)
+    }) {
+      REQUIRE(m <= nX);
+      REQUIRE(k <= nX);
+      REQUIRE(m+k <= nX);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      AnnEstimator<double,LinearScan<double>> ann(h, K, k, m, &ls, SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      auto diff = timerOff();
+      cerr << "ANN initialization with k=" << k << " and m="
+	   << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      ann.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "ANN fitting with nX=" << nX << " and d=" << d << " took "
+	 << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    ann.query(nY, d, &Q[0], &Z[0], &samples[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "ANN query with nY=" << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    double avg = 0.0;
+    for (int_t i = 0; i < nY; ++i) {
+      avg += Z[i];
+      if (m == nX) {
+	// fprintf(stderr, "%s:%d Z[i]=%f\n",
+	// 	__FILE__, __LINE__, Z[i]);
+	REQUIRE(Z[i] - static_cast<int>(Z[i]*m)*1.0/m == 0);
+      }
+      else {
+	REQUIRE(Z[i] == 1.0/nX);
+      }
+      if (k == 0) {
+	REQUIRE(samples[i] == m);
+      }
+      else {
+	REQUIRE(samples[i] == nX+m);
+      }
+    }
+    avg /= nY;
+    if (k == 0 && m <= nX) {
+      REQUIRE_THAT(avg,WithinRel(1.0/nX,0.2));
+    }
+    else {
+      REQUIRE(avg == 1.0/nX);
+    }
+  }
+}
+
+
+
+TEST_CASE( "test_verybig20", "[verybig]" ) {
+  const int_t nX = (1ll << 31);
+  const int_t nY = (1ll << 1);
+  const int_t d = (1l << 1);
+  const uint32_t SEED = 0x12345678;
+  const double h = 1;
+  Kernel K = Kernel::GAUSSIAN;
+  
+  REQUIRE(nX >= nY);
+  REQUIRE(nX % nY == 0);
+
+ 
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+  vector<double> X(nX*d);
+  vector<double> Q(nY*d);
+  vector<double> Z(nY);
+  vector<int_t> samples(nY);
+  
+  int_t l = 0;
+  for (int_t i = 0; i < nY; ++i) {
+    for (int_t j = 0; j < nX/nY; ++j) {
+      for (int_t k = 0; k < d; ++k) {
+	X[l++] = i*(nX/nY);
+      }
+    }
+  }
+  l = 0;
+  for (int_t i = 0; i < nY; ++i) {
+    for (int_t k = 0; k < d; ++k) {
+      Q[l++] = i*(nX/nY);
+    }
+  }
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "Data generation with nX=" << nX << " and nY="
+       << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+  LinearScan<double> ls(Metric::EUCLIDEAN);
+  ls.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  diff = timerOff();
+  cerr << "Linear scan construction with nX=" << nX << " and d="
+       << d << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+  REQUIRE(nX/2 >= 1);
+  for (auto [k,m] : { make_pair(nX,0ll), make_pair(0ll,nX),
+		     /* make_pair(nX/2,nX/2) */ }) {
+    REQUIRE(k <= nX);
+    REQUIRE(m <= nX);
+    REQUIRE(k+m <= nX);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    AnnEstimatorPermuted<double,LinearScan<double>> annp(h, K, k, m, &ls, SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    auto diff = timerOff();
+    cerr << "ANN initialization with k=" << k << ", m="
+	 << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    annp.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "ANN fitting with nX=" << nX << " and d=" << d << " took "
+	 << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    annp.query(nY, d, &Q[0], &Z[0], &samples[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "ANNP query with nY=" << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+    for (int_t i = 0; i < nY; ++i) {
+      REQUIRE_THAT(Z[i], WithinRel(1.0/nY,1e-6));
+      // if (k == nX) 
+      // 	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,1e-6));
+      // else if (m == nX) 
+      // 	REQUIRE_THAT(Z[i], WithinRel(1.0/nY,1e-6));
+      // else
+      // 	REQUIRE(Z[i] == 1.0/nY);
+      if (k == 0)
+	REQUIRE(samples[i] == m);
+      else if (m == 0)
+	REQUIRE(samples[i] == nX);
+      else {
+	REQUIRE(samples[i] >= nX + m);
+	REQUIRE(samples[i] <= 2*nX);
+      }
+    }
+  }
+}
+
+
+
+TEST_CASE( "test_verybig21", "[verybig]" ) {
+  const int_t nX = (1ll << 1);
+  const int_t nY = (1ll << 31);
+  const int_t d = (1l << 1);
+  const uint32_t SEED = 0x12345678;
+  const double h = 1;
+  Kernel K = Kernel::GAUSSIAN;
+
+  REQUIRE(nY >= nX);
+  REQUIRE(nY % nX == 0);
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    vector<double> X(nX*d);
+    vector<double> Q(nY*d);
+    vector<double> Z(nY);
+    vector<int_t> samples(nY);
+
+    int_t l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int_t j = 0; j < d; ++j) {
+	X[l++] = i*128;
+      }
+    }
+    l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int_t j = 0; j < nY/nX; ++j) {
+	for (int_t k = 0; k < d; ++k) {
+	  Q[l++] = i*128;
+	}
+      }
+    }
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "Data generation with nX=" << nX << " and nY="
+       << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+  LinearScan<double> ls(Metric::EUCLIDEAN);
+  ls.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  diff = timerOff();
+  cerr << "Linear scan construction with nX=" << nX << " and d="
+       << d << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+  
+  REQUIRE(nX/2 >= 1);
+  for (auto [k,m] : {
+      make_pair(nX,0ll), make_pair(0ll, nX),
+      make_pair(nX/2,nX/2)
+    }) {
+      REQUIRE(m <= nX);
+      REQUIRE(k <= nX);
+      REQUIRE(m+k <= nX);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      AnnEstimatorPermuted<double,LinearScan<double>> annp(h, K, k, m, &ls, SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      auto diff = timerOff();
+      cerr << "ANNP initialization with k=" << k << " and m="
+	   << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      annp.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "ANNP fitting with nX=" << nX << " and d=" << d << " took "
+	 << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    annp.query(nY, d, &Q[0], &Z[0], &samples[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "ANN query with nY=" << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    double avg = 0.0;
+    for (int_t i = 0; i < nY; ++i) {
+      avg += Z[i];
+      // if (m == nX) {
+      // 	// fprintf(stderr, "%s:%d Z[i]=%f\n",
+      // 	// 	__FILE__, __LINE__, Z[i]);
+      // 	// REQUIRE(Z[i] - static_cast<int>(Z[i]*m)*1.0/m == 0);
+      // 	REQUIRE(Z[i] == 1.0/nX);
+      // }
+      // else {
+      // 	REQUIRE(Z[i] == 1.0/nX);
+      // }
+      REQUIRE_THAT(Z[i], WithinRel(1.0/nX,1e-9));
+      if (k == 0) {
+	REQUIRE(samples[i] == m);
+      }
+      else {
+	REQUIRE(samples[i] >= nX+m);
+	REQUIRE(samples[i] <= 2*nX);
+      }
+    }
+    avg /= nY;
+    // if (k == 0 && m <= nX) {
+    //   REQUIRE_THAT(avg,WithinRel(1.0/nX,0.02));
+    // }
+    // else {
+    //   REQUIRE(avg == 1.0/nX);
+    // }
+    REQUIRE(avg == 1.0/nX);
+  }
+}
+
+
+
+TEST_CASE( "test_verybig22", "[verybig]" ) {
+  const int_t nX = (1ll << 1);
+  const int_t nY = (1ll << 1);
+  const int_t d = (1l << 32);
+  const uint32_t SEED = 0x12345678;
+  const double h = 1;
+  Kernel K = Kernel::GAUSSIAN;
+
+  REQUIRE(nY == nX);
+  REQUIRE(d >= nX);
+  REQUIRE(d % nX == 0);
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    vector<double> X(nX*d);
+    vector<double> Q(nY*d);
+    vector<double> Z(nY);
+    vector<int_t> samples(nY);
+
+    int_t l = 0;
+    for (int_t i = 0; i < nX; ++i) {
+      for (int_t j = 0; j < d; ++j) {
+	X[l++] = i*(d/nX);
+      }
+    }
+    l = 0;
+    for (int_t i = 0; i < nY; ++i) {
+      for (int_t j = 0; j < d; ++j) {
+	Q[l++] = i*(d/nX);
+      }
+    }
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  auto diff = timerOff();
+  cerr << "Data generation with nX=" << nX << " and nY="
+       << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+  LinearScan<double> ls(Metric::EUCLIDEAN);
+  ls.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+  diff = timerOff();
+  cerr << "Linear scan construction with nX=" << nX << " and d="
+       << d << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+  
+  REQUIRE(nX/2 >= 1);
+  for (auto [k,m] : {
+      make_pair(nX,0ll), make_pair(0ll, nX),
+      make_pair(nX/2,nX/2)
+    }) {
+      REQUIRE(m <= nX);
+      REQUIRE(k <= nX);
+      REQUIRE(m+k <= nX);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      AnnEstimatorPermuted<double,LinearScan<double>> annp(h, K, k, m, &ls, SEED);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      auto diff = timerOff();
+      cerr << "ANNP initialization with k=" << k << " and m="
+	   << m << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+      timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+      annp.fit(nX, d, &X[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "ANNP fitting with nX=" << nX << " and d=" << d << " took "
+	 << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    timerOn();
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    annp.query(nY, d, &Q[0], &Z[0], &samples[0]);
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
+    diff = timerOff();
+    cerr << "ANNP query with nY=" << nY << " took " << parseDuration(diff) << endl;
+#endif // DEANN_TESTS_DEBUG_PRINT_TIMES
+    double avg = 0.0;
+    for (int_t i = 0; i < nY; ++i) {
+      avg += Z[i];
+      // if (m == nX) {
+      // 	// fprintf(stderr, "%s:%d Z[i]=%f\n",
+      // 	// 	__FILE__, __LINE__, Z[i]);
+      // 	REQUIRE(Z[i] - static_cast<int>(Z[i]*m)*1.0/m == 0);
+      // }
+      // else {
+      // 	REQUIRE(Z[i] == 1.0/nX);
+      // }
+      REQUIRE_THAT(Z[i], WithinRel(1.0/nX,1e-9));
+      if (k == 0) {
+	REQUIRE(samples[i] == m);
+      }
+      else {
+	REQUIRE(samples[i] >= nX+m);
+	REQUIRE(samples[i] <= 2*nX);
+      }
+    }
+    avg /= nY;
+    // if (k == 0 && m <= nX) {
+    //   REQUIRE_THAT(avg,WithinRel(1.0/nX,0.2));
+    // }
+    // else {
+    //   REQUIRE(avg == 1.0/nX);
+    // }
+    REQUIRE(avg == 1.0/nX);
+  }
+}
+
+
+
+#endif // DEANN_TESTS_VERYBIG
 
 
 

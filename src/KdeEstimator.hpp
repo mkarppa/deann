@@ -13,6 +13,8 @@
  */
 
 namespace deann {
+  using array::int_t;
+  
   /**
    * Abstract base class for estimators. Subclasses provide actual functionality.
    */
@@ -43,8 +45,8 @@ namespace deann {
      * @param param2 The second parameter whose meaning is determined
      * by the subclass.
      */
-    virtual void resetParameters(std::optional<int> param1 = std::nullopt,
-				 std::optional<int> param2 = std::nullopt) = 0;
+    virtual void resetParameters(std::optional<int_t> param1 = std::nullopt,
+				 std::optional<int_t> param2 = std::nullopt) = 0;
 
     /**
      * Reset the random number seed. Functionality is imlemented in
@@ -109,7 +111,7 @@ namespace deann {
      * @param X Pointer to the dataset, interpeted as a n*d matrix, or
      * an array of length n*d.
      */
-    void fit(int n, int d, const T* X) {
+    void fit(int_t n, int_t d, const T* X) {
       if (n < 1 || d < 1)
 	throw std::invalid_argument("Dataset cannot be empty (got n=" +
 				    std::to_string(n) + ", d=" +
@@ -136,7 +138,7 @@ namespace deann {
      * @param samples Pointer to a variable where the  number of samples looked 
      * at will be stored (or null if the information is not required)
      */
-    void query(int d, const T* q, T* Z, int* samples = nullptr) const {
+    void query(int_t d, const T* q, T* Z, int_t* samples = nullptr) const {
       if (!X)
 	throw std::invalid_argument("The object is uninitialized, please call "
 				    "fit first.");
@@ -166,7 +168,7 @@ namespace deann {
      * of samples looked at during the query are stored (or null if the 
      * information is not required).
      */
-    void query(int m, int d, const T* Q, T* Z, int* samples = nullptr) const {
+    void query(int_t m, int_t d, const T* Q, T* Z, int_t* samples = nullptr) const {
       if (!X)
 	throw std::invalid_argument("The object is uninitialized, please call "
 				    "fit first.");
@@ -210,8 +212,8 @@ namespace deann {
   protected:
     T h = 0;
     Kernel K = Kernel::EXPONENTIAL;
-    int n = 0;
-    int d = 0;
+    int_t n = 0;
+    int_t d = 0;
     const T* X = nullptr;
     PseudoRandomNumberGenerator::ValueType rngSeed;
     mutable PseudoRandomNumberGenerator rng;
@@ -248,8 +250,8 @@ namespace deann {
 
 
     
-    virtual void queryImpl(const T* q, T* Z, int* samples) const = 0;
-    virtual void queryImpl(int m, const T* Q, T* Z, int* samples) const = 0;
+    virtual void queryImpl(const T* q, T* Z, int_t* samples) const = 0;
+    virtual void queryImpl(int_t m, const T* Q, T* Z, int_t* samples) const = 0;
     virtual void fitImpl() = 0;
   };
 }

@@ -41,7 +41,7 @@ namespace deann {
      * @param annEstimator Pointer to the estimator object.
      * @param seed Optional random number seed.
      */
-    AnnEstimatorBase(double bandwidth, Kernel kernel, int nearNeighbors,
+    AnnEstimatorBase(double bandwidth, Kernel kernel, int_t nearNeighbors,
                      AnnClass* annEstimator, std::optional<KdeEstimator::
                      PseudoRandomNumberGenerator::ValueType> seed =
                      std::nullopt) :
@@ -56,12 +56,12 @@ namespace deann {
      * reconstruct the object
      * @param newNeighbors New parameter value
      */
-    virtual void setNearNeighbors(int newNeighbors) {
+    virtual void setNearNeighbors(int_t newNeighbors) {
       if (newNeighbors < 0)
 	throw std::invalid_argument("Must have a non-negative number of near "
                                     "neighbors");
       nearNeighbors = newNeighbors;
-      nnsVector = std::vector<int>(nearNeighbors);
+      nnsVector = std::vector<int_t>(nearNeighbors);
       nnsDistVector = std::vector<T>(nearNeighbors);
       scratch = std::vector<T>(this->d + nearNeighbors + randomSamples);
     }
@@ -73,7 +73,7 @@ namespace deann {
      * reconstruct the object
      * @param newSamples New parameter value
      */
-    virtual void setRandomSamples(int newSamples) {
+    virtual void setRandomSamples(int_t newSamples) {
       if (newSamples < 0)
 	throw std::invalid_argument("Must have a non-negative number of random "
                                     "samples");
@@ -88,8 +88,8 @@ namespace deann {
      * @param param1 The number of near neighbors.
      * @param param2 The number of random samples.
      */
-    void resetParameters(std::optional<int> param1 = std::nullopt,
-			 std::optional<int> param2 = std::nullopt) override {
+    void resetParameters(std::optional<int_t> param1 = std::nullopt,
+			 std::optional<int_t> param2 = std::nullopt) override {
       if (param1 && param2) {
         setNearNeighbors(0);
         setRandomSamples(0);
@@ -112,14 +112,14 @@ namespace deann {
 
 
     
-    int nearNeighbors = 0;
-    int randomSamples = 0;
+    int_t nearNeighbors = 0;
+    int_t randomSamples = 0;
     mutable std::vector<T> scratch;
     
 
     
   private:
-    void queryImpl(const T* q, T* Z, int* samples) const override {
+    void queryImpl(const T* q, T* Z, int_t* samples) const override {
       if (nearNeighbors > 0) {
 	annEstimator->query(this->d, nearNeighbors, q, &nnsVector[0],
 			    &nnsDistVector[0], samples);
@@ -127,11 +127,11 @@ namespace deann {
       else if (samples) {
         *samples = 0;
       }
-      int k = 0;
+      int_t k = 0;
       while (k < nearNeighbors && nnsVector[k] >= 0)
 	++k;
       
-      std::unordered_set<int> nns(nnsVector.begin(), nnsVector.begin() + k);
+      std::unordered_set<int_t> nns(nnsVector.begin(), nnsVector.begin() + k);
       
       T Z1 = 0;
       if (k > 0) {
@@ -146,7 +146,7 @@ namespace deann {
 	}
       }
       if (k < this->n && randomSamples > 0) {
-        int S;
+        int_t S;
 	T Z2 = randomSamplingImpl(q, nns, &S);
 	*Z = Z1 * k / this->n +
 	  Z2 * (this->n - k) / this->n;
@@ -160,20 +160,20 @@ namespace deann {
 
 
     
-    void queryImpl(int m, const T* Q, T* Z, int* samples) const override {
-      for (int i = 0; i < m; ++i)
+    void queryImpl(int_t m, const T* Q, T* Z, int_t* samples) const override {
+      for (int_t i = 0; i < m; ++i)
 	queryImpl(Q + i*this->d, Z + i, samples ? samples + i : nullptr);
     }
 
 
 
-    virtual T randomSamplingImpl(const T* q, const std::unordered_set<int>& nns, int* samples)
+    virtual T randomSamplingImpl(const T* q, const std::unordered_set<int_t>& nns, int_t* samples)
       const = 0;
 
 
     
     AnnClass* annEstimator = nullptr;
-    mutable std::vector<int> nnsVector;
+    mutable std::vector<int_t> nnsVector;
     mutable std::vector<T> nnsDistVector;
   };
 
@@ -204,8 +204,8 @@ namespace deann {
      * @param annEstimator Pointer to the estimator object
      * @param seed Optional random number generator seed
      */
-    AnnEstimator(double bandwidth, Kernel kernel, int nearNeighbors,
-                 int randomSamples, AnnClass* annEstimator,
+    AnnEstimator(double bandwidth, Kernel kernel, int_t nearNeighbors,
+                 int_t randomSamples, AnnClass* annEstimator,
                  std::optional<KdeEstimator::PseudoRandomNumberGenerator::
                  ValueType> seed = std::nullopt) :
       AnnEstimatorBase<T,AnnClass>(bandwidth, kernel, nearNeighbors,
@@ -219,19 +219,19 @@ namespace deann {
      * reconstruct the object
      * @param newSamples New parameter value
      */
-    void setRandomSamples(int newSamples) override {
+    void setRandomSamples(int_t newSamples) override {
       AnnEstimatorBase<T,AnnClass>::setRandomSamples(newSamples);
-      sampleIdx = std::vector<uint32_t>(this->randomSamples);
+      sampleIdx = std::vector<FastRng::ValueType>(this->randomSamples);
     }
 
 
 
   private:
-    T randomSamplingImpl(const T* q, const std::unordered_set<int>& nns, int* samples) const
+    T randomSamplingImpl(const T* q, const std::unordered_set<int_t>& nns, int_t* samples) const
       override {
       this->rng(this->randomSamples, &sampleIdx[0]);
-      for (int i = 0; i < this->randomSamples; ++i) {
-        uint32_t idx = sampleIdx[i];
+      for (int_t i = 0; i < this->randomSamples; ++i) {
+        FastRng::ValueType idx = sampleIdx[i];
         while (nns.count(idx))
           idx = sampleIdx[i] = this->rng();
       }
@@ -243,7 +243,7 @@ namespace deann {
     }
 
     
-    mutable std::vector<uint32_t> sampleIdx;
+    mutable std::vector<FastRng::ValueType> sampleIdx;
   };
 
 
@@ -279,8 +279,8 @@ namespace deann {
      * @param annEstimator Pointer to the estimator object
      * @param seed Optional random number generator seed
      */
-    AnnEstimatorPermuted(double bandwidth, Kernel kernel, int nearNeighbors,
-                         int randomSamples, AnnClass* annEstimator,
+    AnnEstimatorPermuted(double bandwidth, Kernel kernel, int_t nearNeighbors,
+                         int_t randomSamples, AnnClass* annEstimator,
                          std::optional<KdeEstimator::
                          PseudoRandomNumberGenerator::ValueType> seed =
                          std::nullopt) :
@@ -299,7 +299,7 @@ namespace deann {
      * reconstruct the object
      * @param newSamples New parameter value
      */
-    void setRandomSamples(int newSamples) override {
+    void setRandomSamples(int_t newSamples) override {
       if (this->X && newSamples + this->nearNeighbors > this->n)
         throw std::invalid_argument("Tried to set too many near neighbors and "
                                     "random samples (" +
@@ -317,7 +317,7 @@ namespace deann {
      * Reset the near neighbors parameter without having to reconstruct the object.
      * @param newNeighbors
      */
-    void setNearNeighbors(int newNeighbors) override {
+    void setNearNeighbors(int_t newNeighbors) override {
       if (this->X && newNeighbors + this->randomSamples > this->n)
         throw std::invalid_argument("Tried to set too many near neighbors and "
                                     "random samples (" +
@@ -338,13 +338,13 @@ namespace deann {
 
 
 
-    inline const uint32_t* getXpermutedIdx() const {
+    inline const FastRng::ValueType* getXpermutedIdx() const {
       return &XpermutedIdx[0];
     }
 
 
 
-    inline int getSampleIdx() const {
+    inline int_t getSampleIdx() const {
       return sampleIdx;
     }
 #endif // DEANN_ENABLE_DEBUG_ACCESSORS
@@ -368,12 +368,12 @@ namespace deann {
 
     
   private:
-    T randomSamplingImpl(const T* q, const std::unordered_set<int>& nns, int* samples) const
+    T randomSamplingImpl(const T* q, const std::unordered_set<int_t>& nns, int_t* samples) const
       override {
-      int correctionCount = 0;
+      int_t correctionCount = 0;
       T correctionAmount = 0;
-      int k = 0;
-      int j = sampleIdx;
+      int_t k = 0;
+      int_t j = sampleIdx;
       while (k < this->randomSamples) {
         if (nns.count(XpermutedIdx[j])) {
           const T* x = &Xpermuted[0] + j*this->d;
@@ -387,11 +387,11 @@ namespace deann {
         }
         j = (j+1) % this->n;
       }
-      int m = this->randomSamples + correctionCount;
+      int_t m = this->randomSamples + correctionCount;
       
       T Z;
-      int m1 = 0;
-      int m2 = 0;
+      int_t m1 = 0;
+      int_t m2 = 0;
       if (m + sampleIdx > this->n) {
         m1 = this->n - sampleIdx;
 	m2 = m - m1;
@@ -427,13 +427,13 @@ namespace deann {
                                     "the total number of datapoints");
       
       XSqNorm = std::vector<T>(this->n);
-      XpermutedIdx = std::vector<uint32_t>(this->n);
-      for (int i = 0; i < this->n; ++i)
+      XpermutedIdx = std::vector<FastRng::ValueType>(this->n);
+      for (int_t i = 0; i < this->n; ++i)
 	XpermutedIdx[i] = i;
       std::mt19937 mt19937rng(this->rngSeed);
       std::shuffle(XpermutedIdx.begin(), XpermutedIdx.end(), mt19937rng);
       Xpermuted = std::vector<T>(this->n * this->d);
-      for (int i = 0; i < this->n; ++i)
+      for (int_t i = 0; i < this->n; ++i)
 	array::mov(this->d, this->X + XpermutedIdx[i]*this->d, &Xpermuted[0] +
 		   i*this->d);
       array::sqNorm(this->n, this->d, &Xpermuted[0], &XSqNorm[0]);
@@ -441,8 +441,8 @@ namespace deann {
     
     std::vector<T> XSqNorm;
     std::vector<T> Xpermuted;
-    std::vector<uint32_t> XpermutedIdx;
-    mutable int sampleIdx = 0;
+    std::vector<FastRng::ValueType> XpermutedIdx;
+    mutable int_t sampleIdx = 0;
   };
 }
 

@@ -38,15 +38,22 @@ namespace deann {
    */
   namespace array {
     /**
+     * Type for expressing array lengths, matches MKL_INT
+     */
+    typedef long long int_t;
+    static_assert(std::is_same<int_t,MKL_INT>::value,
+		  "int_t should match MKL_INT");
+    
+    /**
      * Computes the operation \f$x\gets \max(0,x)\f$.
      * @param d The length of x.
      * @param x Array to modify in-place.
      * @tparam T Data type.
      */
     template<typename T>
-    void maxZero(int d, T* x) {
+    void maxZero(int_t d, T* x) {
       T y;
-      for (int i = 0; i < d; ++i) {
+      for (int_t i = 0; i < d; ++i) {
 	y = x[i];
 	x[i] = y > 0 ? y : 0;
       }
@@ -62,15 +69,15 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    T sqNorm(int d, const T* x);
+    T sqNorm(int_t d, const T* x);
 
     template<>
-    inline float sqNorm(int d, const float* x) {
+    inline float sqNorm(int_t d, const float* x) {
       return cblas_sdot(d, x, 1, x, 1);
     }
 
     template<>
-    inline double sqNorm(int d, const double* x) {
+    inline double sqNorm(int_t d, const double* x) {
       return cblas_ddot(d, x, 1, x, 1);
     }
 
@@ -86,8 +93,8 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void sqNorm(int n, int d, const T* __restrict X, T* __restrict y) {
-      for (int i = 0; i < n; ++i)
+    void sqNorm(int_t n, int_t d, const T* __restrict X, T* __restrict y) {
+      for (int_t i = 0; i < n; ++i)
 	y[i] = sqNorm(d, X + i*d);
     }
 
@@ -100,15 +107,15 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void sqrt(int d, T* x);
+    void sqrt(int_t d, T* x);
 
     template<>
-    void sqrt(int d, float* x) {
+    void sqrt(int_t d, float* x) {
       vsSqrt(d, x, x);
     }
 
     template<>
-    void sqrt(int d, double* x) {
+    void sqrt(int_t d, double* x) {
       vdSqrt(d, x, x);
     }
     
@@ -121,15 +128,15 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void sqr(int d, T* x);
+    void sqr(int_t d, T* x);
 
     template<>
-    void sqr(int d, float* x) {
+    void sqr(int_t d, float* x) {
       vsSqr(d, x, x);
     }
 
     template<>
-    void sqr(int d, double* x) {
+    void sqr(int_t d, double* x) {
       vdSqr(d, x, x);
     }
 
@@ -143,15 +150,15 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void sqr(int d, const T* x, T* y);
+    void sqr(int_t d, const T* x, T* y);
 
     template<>
-    void sqr(int d, const float* x, float* y) {
+    void sqr(int_t d, const float* x, float* y) {
       vsSqr(d, x, y);
     }
     
     template<>
-    void sqr(int d, const double* x, double* y) {
+    void sqr(int_t d, const double* x, double* y) {
       vdSqr(d, x, y);
     }
 
@@ -167,17 +174,17 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    T euclideanDistance(int d, const T* x, const T* y, T* scratch);
+    T euclideanDistance(int_t d, const T* x, const T* y, T* scratch);
 
     template<>
-    float euclideanDistance(int d, const float* x, const float* y,
+    float euclideanDistance(int_t d, const float* x, const float* y,
 			    float* scratch) {
       vsSub(d, x, y, scratch);
       return cblas_snrm2(d, scratch, 1);
     }
 
     template<>
-    double euclideanDistance(int d, const double* x, const double* y,
+    double euclideanDistance(int_t d, const double* x, const double* y,
 			     double* scratch) {
       vdSub(d, x, y, scratch);
       return cblas_dnrm2(d, scratch, 1);
@@ -192,8 +199,8 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void ones(int d, T* x) {
-      for (int i = 0; i < d; ++i)
+    void ones(int_t d, T* x) {
+      for (int_t i = 0; i < d; ++i)
 	x[i] = 1;
     }
    
@@ -210,16 +217,16 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    T taxicabDistance(int d, const T* x, const T* y, T* scratch);
+    T taxicabDistance(int_t d, const T* x, const T* y, T* scratch);
 
     template<>
-    float taxicabDistance(int d, const float* x, const float* y, float* scratch) {
+    float taxicabDistance(int_t d, const float* x, const float* y, float* scratch) {
       vsSub(d, x, y, scratch);
       return cblas_sasum(d, scratch, 1);
     }
 
     template<>
-    double taxicabDistance(int d, const double* x, const double* y, double* scratch) {
+    double taxicabDistance(int_t d, const double* x, const double* y, double* scratch) {
       vdSub(d, x, y, scratch);
       return cblas_dasum(d, scratch, 1);
     }
@@ -239,11 +246,11 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void taxicabDistances(int n, int m, int d, const T* X, const T* Q,
+    void taxicabDistances(int_t n, int_t m, int_t d, const T* X, const T* Q,
 			  T* dists, T* scratch) {
-      for (int i = 0; i < m; ++i) {
+      for (int_t i = 0; i < m; ++i) {
 	const T* q = Q + i*d;
-	for (int j = 0; j < n; ++j) {
+	for (int_t j = 0; j < n; ++j) {
 	  const T* x = X + j*d;
 	  dists[i*n + j] = array::taxicabDistance(d, q, x, scratch);
 	}
@@ -259,17 +266,17 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void add(int d, T* x, const T* y);
+    void add(int_t d, T* x, const T* y);
     
     
     
     template<>
-    void add(int d, float* x, const float* y) {
+    void add(int_t d, float* x, const float* y) {
       cblas_saxpy(d, 1.0f, y, 1, x, 1);
     }
 
     template<>
-    void add(int d, double* x, const double* y) {
+    void add(int_t d, double* x, const double* y) {
       cblas_daxpy(d, 1.0f, y, 1, x, 1);
     }
 
@@ -284,15 +291,15 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void add(int d, T* x, T a, const T* y);
+    void add(int_t d, T* x, T a, const T* y);
 
     template<>
-    void add(int d, float* x, float a, const float* y) {
+    void add(int_t d, float* x, float a, const float* y) {
       cblas_saxpy(d, a, y, 1, x, 1);
     }
 
     template<>
-    void add(int d, double* x, double a, const double* y) {
+    void add(int_t d, double* x, double a, const double* y) {
       cblas_daxpy(d, a, y, 1, x, 1);
     }
 
@@ -309,16 +316,16 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void ger(int m, int n, T alpha, const T* x, const T* y, T* A);
+    void ger(int_t m, int_t n, T alpha, const T* x, const T* y, T* A);
 
     template<>
-    void ger(int m, int n, float alpha, const float* x,
+    void ger(int_t m, int_t n, float alpha, const float* x,
 	     const float* y, float* A) {
       cblas_sger(CblasRowMajor, m, n, alpha, x, 1, y, 1, A, n);
     }
 
     template<>
-    void ger(int m, int n, double alpha, const double* x,
+    void ger(int_t m, int_t n, double alpha, const double* x,
 	     const double* y, double* A) {
       cblas_dger(CblasRowMajor, m, n, alpha, x, 1, y, 1, A, n);
     }
@@ -334,24 +341,24 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void add(int d, const T* __restrict x, const T* __restrict y, T* __restrict z) {
-      for (int i = 0; i < d; ++i)
+    void add(int_t d, const T* __restrict x, const T* __restrict y, T* __restrict z) {
+      for (int_t i = 0; i < d; ++i)
 	z[i] = x[i] + y[i];
     }
 
 
     
     template<typename T>
-    void add(int d, const T* __restrict x, T y, T* __restrict z) {
-      for (int i = 0; i < d; ++i)
+    void add(int_t d, const T* __restrict x, T y, T* __restrict z) {
+      for (int_t i = 0; i < d; ++i)
 	z[i] = x[i] + y;
     }
 
 
     
     template<typename T>
-    void add(int d, T* __restrict x, T y) {
-      for (int i = 0; i < d; ++i)
+    void add(int_t d, T* __restrict x, T y) {
+      for (int_t i = 0; i < d; ++i)
 	x[i] += y;
     }
 
@@ -367,8 +374,8 @@ namespace deann {
      * @tparam UnaryFunction Type of the function.
      */
     template<typename T, typename UnaryFunction>
-    void unary(int d, T* x, UnaryFunction f) {
-      for (int i = 0; i < d; ++i)
+    void unary(int_t d, T* x, UnaryFunction f) {
+      for (int_t i = 0; i < d; ++i)
 	x[i] = f(x[i]);
     }
 
@@ -381,9 +388,9 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    T sum(int d, const T* x) {
+    T sum(int_t d, const T* x) {
       T S = 0;
-      for (int i = 0; i < d; ++i)
+      for (int_t i = 0; i < d; ++i)
 	S += x[i];
       return S;
     }
@@ -398,7 +405,7 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    T mean(int d, const T* x) {
+    T mean(int_t d, const T* x) {
       return sum(d,x)/d;
     }
 
@@ -415,14 +422,14 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void matmulT(int n, int m, int d, const T* __restrict A,
+    void matmulT(int_t n, int_t m, int_t d, const T* __restrict A,
 		 const T* __restrict B, T* __restrict C) {
-      for (int i = 0; i < n; ++i) {
-	for (int j = 0; j < m; ++j) {
+      for (int_t i = 0; i < n; ++i) {
+	for (int_t j = 0; j < m; ++j) {
 	  const T* __restrict a = A + i*d;
 	  const T* __restrict b = B + j*d;
 	  T c = 0;
-	  for (int k = 0; k < d; ++k) {
+	  for (int_t k = 0; k < d; ++k) {
 	    c += *a++ * *b++;
 	  }
 	  *C++ = c;
@@ -450,13 +457,13 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void gemm(bool TA, bool TB, int n, int m, int d, T alpha, const T* A,
+    void gemm(bool TA, bool TB, int_t n, int_t m, int_t d, T alpha, const T* A,
 	      const T* B, T beta, T* C);
 
 
     
     template<>
-    inline void gemm(bool TA, bool TB, int n, int m, int d, float alpha,
+    inline void gemm(bool TA, bool TB, int_t n, int_t m, int_t d, float alpha,
 		     const float* A, const float* B, float beta, float* C) {
       cblas_sgemm(CblasRowMajor, TA ? CblasTrans : CblasNoTrans,
 		  TB ? CblasTrans : CblasNoTrans, n, m, d, alpha, A, 
@@ -466,7 +473,7 @@ namespace deann {
 
 
     template<>
-    inline void gemm(bool TA, bool TB, int n, int m, int d, double alpha,
+    inline void gemm(bool TA, bool TB, int_t n, int_t m, int_t d, double alpha,
 		     const double* A, const double* B, double beta, double* C) {
       cblas_dgemm(CblasRowMajor, TA ? CblasTrans : CblasNoTrans,
 		  TB ? CblasTrans : CblasNoTrans, n, m, d, alpha, A, 
@@ -488,18 +495,18 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void gemv(int n, int d, T alpha, const T* A,
+    void gemv(int_t n, int_t d, T alpha, const T* A,
 	      const T* x, T beta, T* y);
 
     template<>
-    inline void gemv(int n, int d, float alpha, const float* A, const float* x,
+    inline void gemv(int_t n, int_t d, float alpha, const float* A, const float* x,
 		     float beta, float* y) {
       cblas_sgemv(CblasRowMajor, CblasNoTrans, n, d, alpha, A, d, x, 1, beta,
 		  y, 1);
     }
 
     template<>
-    inline void gemv(int n, int d, double alpha, const double* A, const double* x,
+    inline void gemv(int_t n, int_t d, double alpha, const double* A, const double* x,
 		     double beta, double* y) {
       cblas_dgemv(CblasRowMajor, CblasNoTrans, n, d, alpha, A, d, x, 1, beta,
 		  y, 1);
@@ -514,17 +521,17 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void mov(int d, const T* x, T* y);
+    void mov(int_t d, const T* x, T* y);
 
     template<>
-    void mov(int d, const float* x, float* y) {
+    void mov(int_t d, const float* x, float* y) {
       cblas_scopy(d, x, 1, y, 1);
     }
 
 
 
     template<>
-    void mov(int d, const double* x, double* y) {
+    void mov(int_t d, const double* x, double* y) {
       cblas_dcopy(d, x, 1, y, 1);
     }
 
@@ -538,8 +545,8 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void mov(int d, T* x, T c) {
-      for (int i = 0; i < d; ++i)
+    void mov(int_t d, T* x, T c) {
+      for (int_t i = 0; i < d; ++i)
 	x[i] = c;
     }
 
@@ -562,7 +569,7 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void euclideanSqDistances(int n, int m, int d, const T* X, const T* Q,
+    void euclideanSqDistances(int_t n, int_t m, int_t d, const T* X, const T* Q,
 			      const T* XSqNorms, T* dists, T* scratch) {
       if (d > 0) {
 	T* QSqNorms = scratch;
@@ -596,7 +603,7 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void euclideanSqDistances(int n, int d, const T* __restrict X,
+    void euclideanSqDistances(int_t n, int_t d, const T* __restrict X,
 			      const T* __restrict q,
 			      const T* __restrict XSqNorms,
 			      T* __restrict dists) {
@@ -623,8 +630,8 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    bool equal(int d, const T* x, const T* y) {
-      for (int i = 0; i < d; ++i)
+    bool equal(int_t d, const T* x, const T* y) {
+      for (int_t i = 0; i < d; ++i)
 	if (x[i] != y[i])
 	  return false;
       return true;
@@ -643,8 +650,8 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    bool almostEqual(int d, const T* x, const T* y, T epsilon) {
-      for (int i = 0; i < d; ++i)
+    bool almostEqual(int_t d, const T* x, const T* y, T epsilon) {
+      for (int_t i = 0; i < d; ++i)
 	if (std::abs(x[i] - y[i]) > epsilon)
 	  return false;
       return true;
@@ -663,8 +670,8 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    bool almostEqualRelative(int d, const T* x, const T* y, T epsilon) {
-      for (int i = 0; i < d; ++i)
+    bool almostEqualRelative(int_t d, const T* x, const T* y, T epsilon) {
+      for (int_t i = 0; i < d; ++i)
 	if (std::abs((x[i] - y[i])/std::max(x[i],y[i])) > epsilon)
 	  return false;
       return true;
@@ -701,11 +708,11 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void printArray(int n, int d, T* X, FILE* f) {
+    void printArray(int_t n, int_t d, T* X, FILE* f) {
       fprintf(f, "[");
-      for (int i = 0; i < n; ++i) {
+      for (int_t i = 0; i < n; ++i) {
 	fprintf(f, "[");
-	for (int j = 0; j < d; ++j) {
+	for (int_t j = 0; j < d; ++j) {
 	  printElem(X[i*d+j], f);
 	  fprintf(f, "%s", j < d-1 ? ", " : "");
 	}
@@ -726,9 +733,9 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void printCsv(int n, int d, T* X, FILE* f) {
-      for (int i = 0; i < n; ++i) {
-	for (int j = 0; j < d; ++j) {
+    void printCsv(int_t n, int_t d, T* X, FILE* f) {
+      for (int_t i = 0; i < n; ++i) {
+	for (int_t j = 0; j < d; ++j) {
 	  printElem(X[i*d+j], f);
 	  fprintf(f, "%s", j < d-1 ? "," : "");
 	}
@@ -757,7 +764,7 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void splitInHalf(int n, int d, int* m1, int* m2, T* X, T** Y, T** Z) {
+    void splitInHalf(int_t n, int_t d, int_t* m1, int_t* m2, T* X, T** Y, T** Z) {
       *m1 = n / 2;
       *m2 = n - *m1;
       *Y = X;
@@ -774,15 +781,15 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void mul(int d, T* x, T c);
+    void mul(int_t d, T* x, T c);
     
     template<>
-    void mul(int d, float* x, float c) {
+    void mul(int_t d, float* x, float c) {
       cblas_sscal(d, c, x, 1);
     }
 
     template<>
-    void mul(int d, double* x, double c) {
+    void mul(int_t d, double* x, double c) {
       cblas_dscal(d, c, x, 1);
     }
 
@@ -797,8 +804,8 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void mul(int d, const T* __restrict x, T* __restrict y, T c) {
-      for (int i = 0; i < d; ++i)
+    void mul(int_t d, const T* __restrict x, T* __restrict y, T c) {
+      for (int_t i = 0; i < d; ++i)
 	y[i] = x[i]*c;
     }
 
@@ -813,10 +820,10 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void rowwiseSum(int n, int d, const T* __restrict X, T* __restrict y) {
-      for (int i = 0; i < n; ++i) {
+    void rowwiseSum(int_t n, int_t d, const T* __restrict X, T* __restrict y) {
+      for (int_t i = 0; i < n; ++i) {
 	y[i] = 0;
-	for (int j = 0; j < d; ++j) {
+	for (int_t j = 0; j < d; ++j) {
 	  y[i] += X[i*d+j];
 	}
       }
@@ -833,10 +840,10 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void rowwiseMean(int n, int d, const T* __restrict X, T* __restrict y) {
-      for (int i = 0; i < n; ++i) {
+    void rowwiseMean(int_t n, int_t d, const T* __restrict X, T* __restrict y) {
+      for (int_t i = 0; i < n; ++i) {
 	y[i] = 0;
-	for (int j = 0; j < d; ++j) {
+	for (int_t j = 0; j < d; ++j) {
 	  y[i] += X[i*d+j];
 	}
 	y[i] /= d;
@@ -852,17 +859,17 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    void exp(int d, T* x);
+    void exp(int_t d, T* x);
 
 
 
     template<>
-    void exp(int d, float* x) {
+    void exp(int_t d, float* x) {
       vsExp(d, x, x);
     }
 
     template<>
-    void exp(int d, double* x) {
+    void exp(int_t d, double* x) {
       vdExp(d, x, x);
     }
 
@@ -878,28 +885,28 @@ namespace deann {
      * @tparam Metric Metric to consider.
      */
     template<typename T, Metric M>
-    T distance(int d, const T* x, const T* y, T* scratch);
+    T distance(int_t d, const T* x, const T* y, T* scratch);
 
     template<>
-    float distance<float,Metric::EUCLIDEAN>(int d, const float* x,
+    float distance<float,Metric::EUCLIDEAN>(int_t d, const float* x,
 					    const float* y, float* scratch) {
       return euclideanDistance(d,x,y,scratch);
     }
 
     template<>
-    double distance<double,Metric::EUCLIDEAN>(int d, const double* x,
+    double distance<double,Metric::EUCLIDEAN>(int_t d, const double* x,
 					    const double* y, double* scratch) {
       return euclideanDistance(d,x,y,scratch);
     }
 
     template<>
-    float distance<float,Metric::TAXICAB>(int d, const float* x,
+    float distance<float,Metric::TAXICAB>(int_t d, const float* x,
 					    const float* y, float* scratch) {
       return taxicabDistance(d,x,y,scratch);
     }
 
     template<>
-    double distance<double,Metric::TAXICAB>(int d, const double* x,
+    double distance<double,Metric::TAXICAB>(int_t d, const double* x,
 					    const double* y, double* scratch) {
       return taxicabDistance(d,x,y,scratch);
     }
@@ -924,10 +931,10 @@ namespace deann {
      * @tparam M Metric to consider.
      */
     template<typename T, typename S, Metric M>
-    void computeDistsSimple(int m, int d, const T* X, const T* q,
+    void computeDistsSimple(int_t m, int_t d, const T* X, const T* q,
 		      const S* idx, T* Y, T* scratch) {
       const T* x;
-      for (int i = 0; i < m; ++i) {
+      for (int_t i = 0; i < m; ++i) {
 	x = X + idx[i]*d;
 	Y[i] = distance<T,M>(d,x,q,scratch);
       }
@@ -953,13 +960,13 @@ namespace deann {
      * @taparm S Index data type.
      */
     template<typename T, typename S>
-    void computeDistsEuclideanMatmul(int m, int d, const T* X, const T* q,
+    void computeDistsEuclideanMatmul(int_t m, int_t d, const T* X, const T* q,
 				     const S* idx, T* Y, T* scratch) {
       T* samples = scratch;
       scratch += m*d;
       T* sampleSqNorms = scratch;
       scratch += m;
-      for (int i = 0; i < m; ++i) {
+      for (int_t i = 0; i < m; ++i) {
 	const T* x = X + idx[i]*d;
 	T* y = samples + i*d;
 	mov(d, x, y);
@@ -989,7 +996,7 @@ namespace deann {
      * @tparam M Metric to consider.
      */
     template<typename T, typename S, Metric M>
-    void computeDists(int m, int d, const T* X, const T* q,
+    void computeDists(int_t m, int_t d, const T* X, const T* q,
 		      const S* idx, T* Y, T* scratch) {
       computeDistsSimple<T,S,M>(m, d, X, q, idx, Y, scratch);
     }
@@ -1005,8 +1012,8 @@ namespace deann {
      * @tparam T Data type.
      */
     template<typename T>
-    bool allEqual(int d, const T* x, T c) {
-      for (int i = 0; i < d; ++i)
+    bool allEqual(int_t d, const T* x, T c) {
+      for (int_t i = 0; i < d; ++i)
 	if (x[i] != c)
 	  return false;
       return true;

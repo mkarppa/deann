@@ -79,16 +79,16 @@ namespace {
 
 
 
-  static_assert(std::is_same<KdeEstimator::PseudoRandomNumberGenerator::ValueType, uint32_t>::value);
+  static_assert(std::is_same<KdeEstimator::PseudoRandomNumberGenerator::ValueType, uint64_t>::value);
 
   class KdeEstimatorWrapper {
   public:
-    typedef KdeEstimator::PseudoRandomNumberGenerator::ValueType SeedType;
+    typedef FastRng::SeedType SeedType;
 
     
     
     KdeEstimatorWrapper(double bandwidth, const string& kernel,
-			optional<uint32_t> randomSeed = nullopt) {
+			optional<SeedType> randomSeed = nullopt) {
       resetSeed(randomSeed);
       setBandwidth(bandwidth);
       setKernel(kernel);
@@ -96,12 +96,12 @@ namespace {
 
 
 
-    virtual void resetParameters(optional<uint32_t> param1 = nullopt,
-                                 optional<uint32_t> param2 = nullopt) = 0;
+    virtual void resetParameters(optional<int_t> param1 = nullopt,
+                                 optional<int_t> param2 = nullopt) = 0;
 
 
 
-    void resetSeed(optional<uint32_t> randomSeed = nullopt) {
+    void resetSeed(optional<FastRng::SeedType> randomSeed = nullopt) {
       rngSeed = randomSeed;
       if (est.get())
 	est->resetSeed(rngSeed);
@@ -156,7 +156,7 @@ namespace {
 
 
 
-    inline int getD() const {
+    inline int_t getD() const {
       return d;
     };
 
@@ -195,8 +195,8 @@ namespace {
       if (!(inf.shape[1] > 0))
 	throw invalid_argument("Dataset must have a positive number of cols");
 
-      int n = inf.shape[0];
-      int d = inf.shape[1];
+      int_t n = inf.shape[0];
+      int_t d = inf.shape[1];
       est.reset(construct(dt));
       if (dt == Dtype::FLOAT64)
 	dynamic_cast<KdeEstimatorT<double>*>(est.get())->
@@ -253,7 +253,7 @@ namespace {
       	throw invalid_argument("ndim=1 or ndim=2 assumed, but got ndim=" +
       			       to_string(inf.ndim));
 
-      int m = inf.ndim == 2 ? inf.shape[0] : 1;
+      int_t m = inf.ndim == 2 ? inf.shape[0] : 1;
       
       if (m < 1)
       	throw invalid_argument("expected a positive number of rows but got " +
@@ -268,8 +268,8 @@ namespace {
 	throw invalid_argument("dimension mismatch (got: " + to_string(gotD) +
 			       + ", but expected: " + to_string(d) + ")");
 
-      py::array S(py::dtype::of<int>(), m);
-      int* Sptr = reinterpret_cast<int*>(S.request().ptr);
+      py::array S(py::dtype::of<int_t>(), m);
+      int_t* Sptr = reinterpret_cast<int_t*>(S.request().ptr);
       
       py::array Z(Q.dtype(), m);
       T* Zptr = reinterpret_cast<T*>(Z.request().ptr);
@@ -291,8 +291,8 @@ namespace {
     Kernel K = Kernel::EXPONENTIAL;
     optional<SeedType> rngSeed = std::nullopt;
     py::array X;
-    int n = 0;
-    int d = 0;
+    int_t n = 0;
+    int_t d = 0;
     Dtype dtype = Dtype::NONE;
     unique_ptr<KdeEstimator> est;
   };
@@ -307,8 +307,8 @@ namespace {
  
 
     
-    void resetParameters(optional<uint32_t> param1 = nullopt,
-                         optional<uint32_t> param2 = nullopt) override {
+    void resetParameters(optional<int_t> param1 = nullopt,
+                         optional<int_t> param2 = nullopt) override {
       if (param1 || param2)
         throw invalid_argument("Tried to reset parameters on NaiveKde, but the "
                                "class does not support any parameters.");
@@ -335,18 +335,18 @@ namespace {
 
   class RandomSamplingWrapper : public KdeEstimatorWrapper {
   public:
-    RandomSamplingWrapper(double h, const string& kernel, int samples,
-			  optional<uint32_t> randomSeed = nullopt) :
+    RandomSamplingWrapper(double h, const string& kernel, int_t samples,
+			  optional<FastRng::SeedType> randomSeed = nullopt) :
       KdeEstimatorWrapper(h, kernel, randomSeed) {
       resetParameters(samples);
     }
 
 
 
-    void resetParameters(optional<uint32_t> param1 = nullopt,
-                         optional<uint32_t> param2 = nullopt) override {
+    void resetParameters(optional<int_t> param1 = nullopt,
+                         optional<int_t> param2 = nullopt) override {
       if (param1) {
-        int newSamples = *param1;
+        int_t newSamples = *param1;
         if (newSamples < 1)
           throw invalid_argument("Random samples must be positive (got: " +
                                  to_string(newSamples) + ")");
@@ -382,15 +382,15 @@ namespace {
 
     
 
-    int randomSamples = 0;
+    int_t randomSamples = 0;
   };
 
 
 
   class RandomSamplingPermutedWrapper : public KdeEstimatorWrapper {
   public:
-    RandomSamplingPermutedWrapper(double h, const string& kernel, int samples,
-				  optional<uint32_t> randomSeed = nullopt) :
+    RandomSamplingPermutedWrapper(double h, const string& kernel, int_t samples,
+				  optional<FastRng::SeedType> randomSeed = nullopt) :
       KdeEstimatorWrapper(h, kernel, randomSeed) {
       resetParameters(samples);
       if (kernel != "exponential" && kernel != "gaussian")
@@ -400,10 +400,10 @@ namespace {
 
 
 
-    void resetParameters(optional<uint32_t> param1 = nullopt,
-                         optional<uint32_t> param2 = nullopt) override {
+    void resetParameters(optional<int_t> param1 = nullopt,
+                         optional<int_t> param2 = nullopt) override {
       if (param1) {
-        int newSamples = *param1;
+        int_t newSamples = *param1;
         if (newSamples < 1)
           throw invalid_argument("Random samples must be positive (got: " +
                                  to_string(newSamples) + ")");
@@ -440,7 +440,7 @@ namespace {
 
     
 
-    int randomSamples = 0;
+    int_t randomSamples = 0;
   };
 
 
@@ -503,7 +503,7 @@ namespace {
 
 
 
-    py::tuple query(const py::array& Q, int k) {
+    py::tuple query(const py::array& Q, int_t k) {
       if (!isCStyleContiguous(Q))
         throw invalid_argument("The queries must be in a C-style contiguous "
                                "array");
@@ -531,7 +531,7 @@ namespace {
     
   private:
     template<typename T>
-    py::tuple queryImpl(const py::array& Q, const LinearScan<T>& ls, int k) {
+    py::tuple queryImpl(const py::array& Q, const LinearScan<T>& ls, int_t k) {
       if (!hasDtype<T>(Q))
        	throw invalid_argument("Expected queries to have dtype " +
       			       py::cast<string>(py::str(py::dtype::of<T>())) +
@@ -542,7 +542,7 @@ namespace {
       if (inf.ndim > 2)
       	throw invalid_argument("ndim=1 or ndim=2 assumed, but got ndim=" +
       			       to_string(inf.ndim));
-      int m = inf.ndim == 1 ? 1 : inf.shape[0];
+      int_t m = inf.ndim == 1 ? 1 : inf.shape[0];
       
       if (m < 1)
       	throw invalid_argument("expected a positive number of rows but got " +
@@ -552,13 +552,13 @@ namespace {
 	  (inf.ndim == 1 && inf.shape[0] != d))
       	throw invalid_argument("dimension mismatch");
       
-      py::array N(py::dtype::of<int>(), {m,k});
-      int* Nptr = reinterpret_cast<int*>(N.request().ptr);
+      py::array N(py::dtype::of<int_t>(), {m,k});
+      int_t* Nptr = reinterpret_cast<int_t*>(N.request().ptr);
       py::array D(py::dtype::of<T>(), {m,k});
       T* Dptr = reinterpret_cast<T*>(D.request().ptr);
       const T* Qptr = reinterpret_cast<const T*>(inf.ptr);
-      py::array S(py::dtype::of<int>(), m);
-      int* Sptr = reinterpret_cast<int*>(S.request().ptr);
+      py::array S(py::dtype::of<int_t>(), m);
+      int_t* Sptr = reinterpret_cast<int_t*>(S.request().ptr);
       ls.query(m, d, k, Qptr, Nptr, Dptr, Sptr);
       return py::make_tuple(D, N, S);
     }
@@ -567,8 +567,8 @@ namespace {
 
     string metric;
     py::array X;
-    int n = 0;
-    int d = 0;
+    int_t n = 0;
+    int_t d = 0;
     Dtype dtype = Dtype::NONE;
     unique_ptr<LinearScan<float>> lsf;
     unique_ptr<LinearScan<double>> lsd;
@@ -587,7 +587,7 @@ namespace {
     
     
     template<typename T>
-    void query(int d, int k, const T* Q, int* N, T* D, int* S) const {
+    void query(int_t d, int_t k, const T* Q, int_t* N, T* D, int_t* S) const {
       py::capsule capsule(Q, [](void*) { });
       py::array_t<T> arr({d}, {sizeof(T)}, Q, capsule);
       
@@ -644,7 +644,7 @@ namespace {
                                  "match)");
       }	
       
-      int m = nn.ndim() == 1 ? nn_inf.shape[0] : nn_inf.shape[1];
+      int_t m = nn.ndim() == 1 ? nn_inf.shape[0] : nn_inf.shape[1];
       if (m > k)
         throw invalid_argument("Requested " + to_string(k) + " neighbors, "
                                "but " + to_string(m) + " were returned.");
@@ -660,16 +660,16 @@ namespace {
       
       if (hasDtype<int32_t>(nn)) {
         int32_t* p = reinterpret_cast<int32_t*>(nn_inf.ptr);
-        for (int i = 0; i < m; ++i)
+        for (int_t i = 0; i < m; ++i)
           N[i] = p[i];
-        for (int i = m; i < k; ++i)
+        for (int_t i = m; i < k; ++i)
           N[i] = -1;
       }
       else if (hasDtype<int64_t>(nn)) {
         int64_t* p = reinterpret_cast<int64_t*>(nn_inf.ptr);
-        for (int i = 0; i < m; ++i)
+        for (int_t i = 0; i < m; ++i)
           N[i] = p[i];
-        for (int i = m; i < k; ++i)
+        for (int_t i = m; i < k; ++i)
           N[i] = -1;
       }
       else {
@@ -680,16 +680,16 @@ namespace {
       if (hasDists) {
         if (hasDtype<float>(dists)) {
           float* p = reinterpret_cast<float*>(dists_inf.ptr);
-          for (int i = 0; i < m; ++i)
+          for (int_t i = 0; i < m; ++i)
             D[i] = p[i];
-          for (int i = m; i < k; ++i)
+          for (int_t i = m; i < k; ++i)
             D[i] = -1;
         }
         else if (hasDtype<double>(dists)) {
           double* p = reinterpret_cast<double*>(dists_inf.ptr);
-          for (int i = 0; i < m; ++i)
+          for (int_t i = 0; i < m; ++i)
             D[i] = p[i];
-          for (int i = m; i < k; ++i)
+          for (int_t i = m; i < k; ++i)
             D[i] = -1;
         }
         else {
@@ -698,7 +698,7 @@ namespace {
         }
       }
       else {
-        for (int i = 0; i < k; ++i)
+        for (int_t i = 0; i < k; ++i)
           D[i] = -1;
       }
       
@@ -728,19 +728,19 @@ namespace {
 
   class AnnEstimatorWrapper : public KdeEstimatorWrapper {
   public:
-    AnnEstimatorWrapper(double h, const string& kernel, int nearNeighbors,
-			int randomSamples, py::object ann, 
-			optional<uint32_t> randomSeed = nullopt) :
+    AnnEstimatorWrapper(double h, const string& kernel, int_t nearNeighbors,
+			int_t randomSamples, py::object ann, 
+			optional<FastRng::SeedType> randomSeed = nullopt) :
       KdeEstimatorWrapper(h, kernel, randomSeed), annObject(ann) {
       resetParameters(nearNeighbors, randomSamples);
     }
 
     
 
-    void resetParameters(optional<uint32_t> param1 = nullopt,
-                         optional<uint32_t> param2 = nullopt) override {
-      int newNeighbors = param1 ? *param1 : nearNeighbors;
-      int newSamples = param2 ? *param2 : randomSamples;
+    void resetParameters(optional<int_t> param1 = nullopt,
+                         optional<int_t> param2 = nullopt) override {
+      int_t newNeighbors = param1 ? *param1 : nearNeighbors;
+      int_t newSamples = param2 ? *param2 : randomSamples;
       if (newNeighbors < 0)
 	throw invalid_argument("Near neighbors must be non-negative (got: " +
 			       to_string(nearNeighbors) + ")");
@@ -782,8 +782,8 @@ namespace {
  
    
 
-    int nearNeighbors = 0;
-    int randomSamples = 0;
+    int_t nearNeighbors = 0;
+    int_t randomSamples = 0;
     AnnObject annObject;
   };
 
@@ -791,19 +791,19 @@ namespace {
 
   class AnnEstimatorPermutedWrapper : public KdeEstimatorWrapper {
   public:
-    AnnEstimatorPermutedWrapper(double h, const string& kernel, int nearNeighbors,
-                                int randomSamples, py::object ann, 
-                                optional<uint32_t> randomSeed = nullopt) :
+    AnnEstimatorPermutedWrapper(double h, const string& kernel, int_t nearNeighbors,
+                                int_t randomSamples, py::object ann, 
+                                optional<FastRng::SeedType> randomSeed = nullopt) :
       KdeEstimatorWrapper(h, kernel, randomSeed), annObject(ann) {
       resetParameters(nearNeighbors, randomSamples);
     }
 
     
 
-    void resetParameters(optional<uint32_t> param1 = nullopt,
-                         optional<uint32_t> param2 = nullopt) override {
-      int newNeighbors = param1 ? *param1 : nearNeighbors;
-      int newSamples = param2 ? *param2 : randomSamples;
+    void resetParameters(optional<int_t> param1 = nullopt,
+                         optional<int_t> param2 = nullopt) override {
+      int_t newNeighbors = param1 ? *param1 : nearNeighbors;
+      int_t newSamples = param2 ? *param2 : randomSamples;
       if (newNeighbors < 0)
 	throw invalid_argument("Near neighbors must be non-negative (got: " +
 			       to_string(nearNeighbors) + ")");
@@ -845,8 +845,8 @@ namespace {
  
    
 
-    int nearNeighbors = 0;
-    int randomSamples = 0;
+    int_t nearNeighbors = 0;
+    int_t randomSamples = 0;
     AnnObject annObject;
   };
 }
@@ -935,7 +935,7 @@ multiplication is used to speed up the computation.)pydoc")
 Computes the unbiased estimate :math:`Z = \frac{1}{m}\sum_{x'\in X'} K_h(q,x')` 
 where the sequence :math:`X'=(x'_0,x'_1,\ldots,x'_{m-1})` is chosen uniformly 
 and independently at random.)pydoc")
-    .def(py::init<double, const string&, int, optional<uint32_t>>(),
+    .def(py::init<double, const string&, int_t, optional<uint32_t>>(),
 	 R"pydoc(Constructor.
 
 :param bandwidth: The bandwidth :math:`h>0`.
@@ -959,7 +959,7 @@ where the set :math:`X'=\{x'_0,x'_1,\ldots,x'_{m-1}\}` is determined during
 preprocessing by permuting the dataset at random. During queries, a contiguous 
 subset of points is used, and if Euclidean metric is used, the estimate is 
 computed using matrix multiplication.)pydoc")
-    .def(py::init<double, const string&, int, optional<uint32_t>>(),
+    .def(py::init<double, const string&, int_t, optional<uint32_t>>(),
 	 R"pydoc(Constructor.
 
 :param bandwidth: The bandwidth :math:`h>0`.
@@ -1028,7 +1028,7 @@ The ANN object must provide a `query` function whose interface matches that of
 
 This variant uses independent random sampling like :class:`RandomSampling`.
 )pydoc")
-    .def(py::init<double, const string&, int, int, py::object, optional<uint32_t>>(),
+    .def(py::init<double, const string&, int_t, int_t, py::object, optional<uint32_t>>(),
 	 R"pydoc(Constructor.
 
 :param bandwidth: The bandwidth :math:`h>0`.
@@ -1062,7 +1062,7 @@ The ANN object must provide a `query` function whose interface matches that of
 :class:`LinearScan`.
 
 This variant uses permuted random sampling like :class:`RandomSamplingPermuted`.)pydoc")
-    .def(py::init<double, const string&, int, int, py::object, optional<uint32_t>>(),
+    .def(py::init<double, const string&, int_t, int_t, py::object, optional<uint32_t>>(),
 	 R"pydoc(Constructor.
 
 :param bandwidth: The bandwidth :math:`h>0`.

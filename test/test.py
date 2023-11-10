@@ -229,7 +229,7 @@ def test_naive_kde1():
     assert mu.shape[0] == Z.shape[0]   
     assert np.all(np.abs(Z-mu) < abs_epsilon)
     assert np.all(np.abs((Z-mu)/mu) < rel_epsilon)
-    assert S.dtype == np.int32
+    assert S.dtype == np.int64
     assert S.ndim == 1
     assert S.shape[0] == mu.shape[0]
     assert np.all(S == X.shape[0])
@@ -247,7 +247,7 @@ def test_naive_kde1():
     assert mu.shape[0] == Z.shape[0]   
     assert np.all(np.abs(Z-mu) < abs_epsilon)
     assert np.all(np.abs((Z-mu)/mu) < rel_epsilon)
-    assert S.dtype == np.int32
+    assert S.dtype == np.int64
     assert S.ndim == 1
     assert S.shape[0] == mu.shape[0]
     assert np.all(S == X.shape[0])
@@ -291,7 +291,7 @@ def test_naive_kde1():
     assert mu.shape[0] == Z.shape[0]   
     assert np.all(np.abs(Z-mu) < abs_epsilon)
     assert np.all(np.abs((Z-mu)/mu) < rel_epsilon)
-    assert S.dtype == np.int32
+    assert S.dtype == np.int64
     assert S.ndim == 1
     assert S.shape[0] == mu.shape[0]
     assert np.all(S == X.shape[0])
@@ -312,7 +312,7 @@ def test_naive_kde1():
             print(mu[i], Z[i], np.abs(Z[i]-mu[i]), np.abs((Z[i]-mu[i])/mu[i]))
     assert np.all(np.abs(Z-mu) < abs_epsilon)
     assert np.all(np.abs((Z-mu)/mu) < rel_epsilon)
-    assert S.dtype == np.int32
+    assert S.dtype == np.int64
     assert S.ndim == 1
     assert S.shape[0] == mu.shape[0]
     assert np.all(S == X.shape[0])
@@ -330,7 +330,7 @@ def test_naive_kde1():
     assert mu.shape[0] == Z.shape[0]   
     assert np.all(np.abs(Z-mu) < abs_epsilon)
     assert np.all(np.abs((Z-mu)/mu) < rel_epsilon)
-    assert S.dtype == np.int32
+    assert S.dtype == np.int64
     assert S.ndim == 1
     assert S.shape[0] == mu.shape[0]
     assert np.all(S == X.shape[0])
@@ -644,8 +644,8 @@ def test_random_sampling_permuted():
                 assert Z2.shape[0] == Y.shape[0]
                 assert S1.ndim == 1
                 assert S2.ndim == 1
-                assert S1.dtype == np.int32
-                assert S2.dtype == np.int32
+                assert S1.dtype == np.int64
+                assert S2.dtype == np.int64
                 assert S1.shape[0] == Y.shape[0]
                 assert S2.shape[0] == Y.shape[0]
                 assert np.all(S1 == m)
@@ -745,10 +745,7 @@ def test_brute_nn():
             assert isinstance(samples,np.ndarray)
 
             assert dists.ndim == 2
-            if metric == 'euclidean':
-                assert dists.dtype == dt
-            else:
-                assert dists.dtype == np.float64
+            assert dists.dtype == np.float64
             assert dists.shape[0] == 1
             assert dists.shape[1] == k
             for i in range(1,k):
@@ -863,10 +860,7 @@ def test_linear_scan():
                 for i in range(Y.shape[0]):
                     q = Y[i,:]
                     (dists_bnn, nn_bnn, samples_bnn) = bnn.query(q,k)
-                    if metric == 'euclidean':
-                        assert dists_bnn.dtype == dt
-                    else:
-                        assert dists_bnn.dtype == np.float64
+                    assert dists_bnn.dtype == np.float64
                     assert dists_bnn.ndim == 2
                     assert dists_bnn.shape == (1,k)
                     assert nn_bnn.dtype == np.int64
@@ -878,7 +872,7 @@ def test_linear_scan():
                     assert samples_bnn.dtype == np.int32
 
                     (dists_ls, nn_ls, samples_ls) = ls.query(q,k)
-                    assert nn_ls.dtype == np.int32
+                    assert nn_ls.dtype == np.int64
                     assert nn_ls.ndim == 2
                     assert nn_ls.shape == (1,k)
                     assert dists_ls.dtype == dt
@@ -887,7 +881,7 @@ def test_linear_scan():
                     assert samples_ls.ndim == 1
                     assert samples_ls.shape[0] == 1
                     assert samples_ls[0] == X.shape[0]
-                    assert samples_ls.dtype == np.int32
+                    assert samples_ls.dtype == np.int64
 
                     if not np.array_equal(nn_bnn,nn_ls):
                         for i in range(nn_bnn.shape[1]):
@@ -1076,7 +1070,7 @@ def test_ann_estimator1():
                     assert np.abs(Z-mu) < DELTA32
                     assert np.abs(Z-mu)/mu < EPSILON32
                 assert S.ndim == 1 and S.shape[0] == 1
-                assert S.dtype == np.int32
+                assert S.dtype == np.int64
                 assert S[0] == X.shape[0]
                     
             ann_object = AnnObject(bnn)               
@@ -1589,7 +1583,7 @@ def test_ann_estimator_permuted1():
                     assert np.abs(Z-mu) < DELTA32
                     assert np.abs(Z-mu)/mu < EPSILON32
                 assert S.ndim == 1 and S.shape[0] == 1
-                assert S.dtype == np.int32
+                assert S.dtype == np.int64
                 assert S[0] == X.shape[0]
                 
             ann_object = AnnObject(bnn)               

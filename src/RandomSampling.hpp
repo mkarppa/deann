@@ -29,7 +29,7 @@ namespace deann {
      * @param randomSamples The number of random samples \f$m>0\f$
      * @param seed Pseudorandom generator seed, or nullopt for unpredictable initialization
      */ 
-    RandomSampling(T bandwidth, Kernel kernel, int randomSamples,
+    RandomSampling(T bandwidth, Kernel kernel, int_t randomSamples,
 		   std::optional<KdeEstimator::PseudoRandomNumberGenerator::
 		   ValueType> seed = std::nullopt) :
       KdeEstimatorT<T>(bandwidth, kernel, seed) {
@@ -42,13 +42,13 @@ namespace deann {
      * Resets the number of random samples
      * @param newSamples New number of random samples.
      */
-    void setRandomSamples(int newSamples) {
+    void setRandomSamples(int_t newSamples) {
       if (newSamples < 1)
 	throw std::invalid_argument("The number of samples must be positive "
 				    "(got: " + std::to_string(newSamples) + ")");
       randomSamples = newSamples;
       scratch = std::vector<T>(randomSamples + this->d);
-      sampleIdx = std::vector<uint32_t>(randomSamples);
+      sampleIdx = std::vector<FastRng::ValueType>(randomSamples);
     }
 
 
@@ -58,8 +58,8 @@ namespace deann {
      * @param param1 New number of random samples.
      * @param param2 Unused. Attempting to use throws an exception.
      */
-    void resetParameters(std::optional<int> param1 = std::nullopt,
-			 std::optional<int> param2 = std::nullopt) override {
+    void resetParameters(std::optional<int_t> param1 = std::nullopt,
+			 std::optional<int_t> param2 = std::nullopt) override {
       if (param2)
 	throw std::invalid_argument("The RandomSampling class has only one "
 				    "parameter, but tried to reset two "
@@ -73,24 +73,24 @@ namespace deann {
   private:
     void fitImpl() override {
       scratch = std::vector<T>(this->d + randomSamples);
-      sampleIdx = std::vector<uint32_t>(randomSamples);
+      sampleIdx = std::vector<FastRng::ValueType>(randomSamples);
     }
 
 
 
-    void queryImpl(const T* q, T* Z, int* samples) const override {
+    void queryImpl(const T* q, T* Z, int_t* samples) const override {
       this->rng(randomSamples, &sampleIdx[0]);
 
       if (this->K == Kernel::EXPONENTIAL) 
-	*Z = kdeSubset<T,uint32_t,Kernel::EXPONENTIAL>(randomSamples, this->d, this->h,
+	*Z = kdeSubset<T,FastRng::ValueType,Kernel::EXPONENTIAL>(randomSamples, this->d, this->h,
                                                        this->X, q, &sampleIdx[0],
                                                        &scratch[0]);
       else if (this->K == Kernel::GAUSSIAN)
-	*Z = kdeSubset<T,uint32_t,Kernel::GAUSSIAN>(randomSamples, this->d, this->h,
+	*Z = kdeSubset<T,FastRng::ValueType,Kernel::GAUSSIAN>(randomSamples, this->d, this->h,
                                                     this->X, q, &sampleIdx[0],
                                                     &scratch[0]);
       else if (this->K == Kernel::LAPLACIAN)
-	*Z = kdeSubset<T,uint32_t,Kernel::LAPLACIAN>(randomSamples, this->d, this->h,
+	*Z = kdeSubset<T,FastRng::ValueType,Kernel::LAPLACIAN>(randomSamples, this->d, this->h,
                                                      this->X, q, &sampleIdx[0],
                                                      &scratch[0]);
       else
@@ -102,16 +102,16 @@ namespace deann {
 
     
 
-    void queryImpl(int m, const T* Q, T* Z, int* samples) const override {
-      for (int i = 0; i < m; ++i) 
+    void queryImpl(int_t m, const T* Q, T* Z, int_t* samples) const override {
+      for (int_t i = 0; i < m; ++i) 
         queryImpl(Q + i*this->d, Z + i, samples ? samples + i : nullptr);
     }
 
 
 
-    int randomSamples = 0;
+    int_t randomSamples = 0;
     mutable std::vector<T> scratch;
-    mutable std::vector<uint32_t> sampleIdx;
+    mutable std::vector<FastRng::ValueType> sampleIdx;
   };
 }
 

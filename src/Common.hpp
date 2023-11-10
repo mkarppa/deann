@@ -15,6 +15,8 @@
  * This namespace contains all libkde content.
  */
 namespace deann {
+  using array::int_t;
+  
   /**
    * Given \f$m\f$ distances, evaluates the KDE for the given kernel.
    * 
@@ -26,7 +28,7 @@ namespace deann {
    * @tparam K The kernel
    */
   template<typename T, Kernel K>
-  T kdeDists(int m, T h, const T* dists, T* scratch) {
+  T kdeDists(int_t m, T h, const T* dists, T* scratch) {
     if (K == Kernel::GAUSSIAN) {
       array::sqr(m, dists, scratch);
       array::mul(m, scratch, static_cast<T>(-0.5) / (h*h));
@@ -55,7 +57,7 @@ namespace deann {
    * @tparam T Datatype
    */
   template<typename T>
-  T kdeDists(int m, T h, const T* dists, T* scratch, Kernel K) {
+  T kdeDists(int_t m, T h, const T* dists, T* scratch, Kernel K) {
     switch(K) {
     case Kernel::EXPONENTIAL:
       return kdeDists<T,Kernel::EXPONENTIAL>(m,h,dists,scratch);
@@ -84,7 +86,7 @@ namespace deann {
    * @tparam K The kernel
    */
   template<typename T, Kernel K>
-  T kdeDistsInPlace(int m, T h, T* scratch) {
+  T kdeDistsInPlace(int_t m, T h, T* scratch) {
     if (K == Kernel::GAUSSIAN) {
       array::sqr(m, scratch);
       array::mul(m, scratch, static_cast<T>(-0.5) / (h*h));
@@ -121,7 +123,7 @@ namespace deann {
    * @tparam K The kernel
    */
   template<typename T, typename S, Kernel K>
-  T kdeSubset(int m, int d, T h, const T* X, const T* q, S* idx,
+  T kdeSubset(int_t m, int_t d, T h, const T* X, const T* q, S* idx,
 	      T* scratch) {
     if (K == Kernel::LAPLACIAN)
       array::computeDists<T,S,Metric::TAXICAB>(m, d, X, q, idx, scratch,
@@ -154,7 +156,7 @@ namespace deann {
    * @tparam S Index datatype (integer type)
    */
   template<typename T, typename S>
-  T kdeSubset(int m, int d, T h, const T* X, const T* q, S* idx,
+  T kdeSubset(int_t m, int_t d, T h, const T* X, const T* q, S* idx,
 	      T* scratch, Kernel K) {
     switch(K) {
     case Kernel::EXPONENTIAL:

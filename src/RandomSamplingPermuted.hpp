@@ -27,7 +27,7 @@ namespace deann {
      * @param randomSamples The number of random samples \f$m>0\f$
      * @param seed Pseudorandom generator seed, or nullopt for unpredictable initialization
      */ 
-    RandomSamplingPermuted(T bandwidth, Kernel kernel, int randomSamples,
+    RandomSamplingPermuted(T bandwidth, Kernel kernel, int_t randomSamples,
 			   std::optional<KdeEstimator::
 			   PseudoRandomNumberGenerator::ValueType> seed =
 			   std::nullopt) :
@@ -44,7 +44,7 @@ namespace deann {
      * Resets the number of random samples
      * @param newSamples New number of random samples.
      */
-    void setRandomSamples(int newSamples) {
+    void setRandomSamples(int_t newSamples) {
       if (newSamples < 1)
 	throw std::invalid_argument("The number of samples must be positive "
 				    "(got: " + std::to_string(newSamples) + ")");
@@ -64,8 +64,8 @@ namespace deann {
      * @param param1 New number of random samples.
      * @param param2 Unused. Attempting to use throws an exception.
      */
-    void resetParameters(std::optional<int> param1 = std::nullopt,
-			 std::optional<int> param2 = std::nullopt) override {
+    void resetParameters(std::optional<int_t> param1 = std::nullopt,
+			 std::optional<int_t> param2 = std::nullopt) override {
       if (param2)
 	throw std::invalid_argument("The RandomSamplingPermuted class has only "
 				    "one parameter, but tried to reset two "
@@ -99,7 +99,7 @@ namespace deann {
 
 
 
-    inline int getSampleIdx() const {
+    inline int_t getSampleIdx() const {
       return sampleIdx;
     }
 
@@ -121,13 +121,13 @@ namespace deann {
 				    "samples requested.");
       setRandomSamples(randomSamples);
       XSqNorm = std::vector<T>(this->n);
-      std::vector<uint32_t> indices(this->n);
-      for (int i = 0; i < this->n; ++i)
+      std::vector<FastRng::ValueType> indices(this->n);
+      for (int_t i = 0; i < this->n; ++i)
 	indices[i] = i;
       std::mt19937 mt19937rng(this->rngSeed);
       std::shuffle(indices.begin(), indices.end(), mt19937rng);
       Xpermuted = std::vector<T>(this->n * this->d);
-      for (int i = 0; i < this->n; ++i)
+      for (int_t i = 0; i < this->n; ++i)
 	array::mov(this->d, this->X + indices[i]*this->d, &Xpermuted[0] +
 		   i*this->d);
       array::sqNorm(this->n, this->d, &Xpermuted[0], &XSqNorm[0]);
@@ -135,10 +135,10 @@ namespace deann {
 
 
     
-    void queryImpl(const T* q, T* Z, int* samples) const override {
+    void queryImpl(const T* q, T* Z, int_t* samples) const override {
       if (randomSamples + sampleIdx > this->n) {
-	int m1 = this->n - sampleIdx;
-	int m2 = randomSamples - m1;
+	int_t m1 = this->n - sampleIdx;
+	int_t m2 = randomSamples - m1;
 	T Z1 = kdeEuclideanMatmul(m1, this->d, this->h,
 				  &Xpermuted[0] + sampleIdx*this->d, q,
 				  &XSqNorm[0] + sampleIdx, &scratch[0],
@@ -160,15 +160,15 @@ namespace deann {
 
 
 
-    void queryImpl(int m, const T* Q, T* Z, int* samples) const override {
-      for (int i = 0; i < m; ++i) 
+    void queryImpl(int_t m, const T* Q, T* Z, int_t* samples) const override { 
+      for (int_t i = 0; i < m; ++i) 
         queryImpl(Q + i*this->d, Z + i, samples ? samples + i : nullptr);
     }
 
 
 
-    int randomSamples = 0;
-    mutable int sampleIdx = 0;
+    int_t randomSamples = 0;
+    mutable int_t sampleIdx = 0;
     std::vector<T> XSqNorm;
     mutable std::vector<T> scratch;
     std::vector<T> Xpermuted;

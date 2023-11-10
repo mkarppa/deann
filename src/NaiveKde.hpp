@@ -32,7 +32,7 @@ namespace deann {
    * @tparam T Data type
    */
   template<typename T>
-  void kdeEuclideanSimple(int n, int m, int d, T h, const T* __restrict X,
+  void kdeEuclideanSimple(int_t n, int_t m, int_t d, T h, const T* __restrict X,
 			  const T* __restrict Q, T* __restrict mu,
 			  T* __restrict scratch,
 			  Kernel kernel) {
@@ -43,10 +43,10 @@ namespace deann {
     default:
       throw std::invalid_argument("Unsupported kernel supplied");
     }
-    for (int i = 0; i < m; ++i) {
+    for (int_t i = 0; i < m; ++i) {
       mu[i] = 0;
       const T* q = Q + i*d;
-      for (int j = 0; j < n; ++j) {
+      for (int_t j = 0; j < n; ++j) {
 	const T* x = X + j*d;
 	T dist = array::euclideanDistance(d, q, x, scratch);
 	T kv = 0;
@@ -81,7 +81,7 @@ namespace deann {
    * @tparam T Data type
    */
   template<typename T>
-  void kdeEuclideanMatmul(int n, int m, int d, T h, const T* __restrict X,
+  void kdeEuclideanMatmul(int_t n, int_t m, int_t d, T h, const T* __restrict X,
 			  const T* __restrict Q, T* __restrict mu,
 			  const T* __restrict XSqNorms, T* __restrict scratch,
 			  Kernel kernel) {
@@ -92,11 +92,12 @@ namespace deann {
     default:
       throw std::invalid_argument("Unsupported kernel supplied");
     }
-    
+
     if (m < 1)
       return;
-  
+
     array::euclideanSqDistances(n, m, d, X, Q, XSqNorms, scratch, scratch + n*m);
+
     if (kernel == Kernel::EXPONENTIAL) {
       array::sqrt(m*n, scratch);
       array::mul(m*n, scratch, -static_cast<T>(1)/h);
@@ -129,7 +130,7 @@ namespace deann {
    * @return The KDE value
    */
   template<typename T>
-  T kdeEuclideanMatmul(int n, int d, T h, const T* __restrict X,
+  T kdeEuclideanMatmul(int_t n, int_t d, T h, const T* __restrict X,
 		       const T* __restrict q,  const T* __restrict XSqNorms,
 		       T* __restrict scratch, Kernel kernel) {
     switch(kernel) {
@@ -170,7 +171,7 @@ namespace deann {
    * @tparam T Data type
    */
   template<typename T>
-  void kdeTaxicab(int n, int m, int d, T h, const T* __restrict X,
+  void kdeTaxicab(int_t n, int_t m, int_t d, T h, const T* __restrict X,
 		  const T* __restrict Q, T* __restrict mu,
 		  T* __restrict scratch,
 		  Kernel kernel) {
@@ -185,9 +186,9 @@ namespace deann {
       return;
 
     T* __restrict taxiScratch = scratch + m*n;
-    for (int i = 0; i < m; ++i) {
+    for (int_t i = 0; i < m; ++i) {
       const T* __restrict q = Q + i*d;
-      for (int j = 0; j < n; ++j) {
+      for (int_t j = 0; j < n; ++j) {
 	const T* __restrict x = X + j*d;
 	scratch[i*n + j] = array::taxicabDistance(d, q, x, taxiScratch);
       }
@@ -221,8 +222,8 @@ namespace deann {
     /**
      * Not used by the class. Throws an exception.
      */
-    void resetParameters(std::optional<int> param1 = std::nullopt,
-			 std::optional<int> param2 = std::nullopt) override {
+    void resetParameters(std::optional<int_t> param1 = std::nullopt,
+			 std::optional<int_t> param2 = std::nullopt) override {
       if (param1 || param2)
 	throw std::invalid_argument("The NaiveKde class has no parameters to "
 				    "set, but tried to reset parameters "
@@ -241,7 +242,7 @@ namespace deann {
 
 
     
-    void queryImpl(const T* q, T* Z, int* samples) const override {
+    void queryImpl(const T* q, T* Z, int_t* samples) const override {
       if (this->X < q + this->d && q < this->X+this->n*this->d)
 	throw std::invalid_argument("q breaks aliasing rules");
       
@@ -249,7 +250,7 @@ namespace deann {
       switch(this->K) {	
       case Kernel::EXPONENTIAL:
       case Kernel::GAUSSIAN:
-	scratch = new T[this->n+1+std::max(this->n,1)];
+	scratch = new T[this->n+1+std::max(this->n,static_cast<int_t>(1))];
 	kdeEuclideanMatmul(this->n, 1, this->d, this->h, this->X, q, Z,
 			   &XSqNorm[0], scratch, this->K);
 	break;
@@ -268,14 +269,13 @@ namespace deann {
 
 
     
-    void queryImpl(int m, const T* Q, T* Z, int* samples) const override {
+    void queryImpl(int_t m, const T* Q, T* Z, int_t* samples) const override {
       if ((this->X - this->d < Q && Q < this->X+this->n*this->d) ||
 	  (this->X <= Q + m*this->d - 1 && Q + m*this->d - 1 < this->X +
 	   this->n*this->d))
 	throw std::invalid_argument("Q breaks aliasing rules");
-
       if (this->K == Kernel::EXPONENTIAL || this->K == Kernel::GAUSSIAN) {
-	std::vector<T> scratch(m*this->n+m+std::max(this->n,m));      
+	std::vector<T> scratch(m*this->n+m+std::max(this->n,m));
 	kdeEuclideanMatmul(this->n, m, this->d, this->h, this->X, Q, Z,
 			   &XSqNorm[0], &scratch[0], this->K);
       }
