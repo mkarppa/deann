@@ -51,10 +51,18 @@ endif()
 find_path(MKL_INCLUDE_DIR mkl_cblas.h HINTS ${MKL_ROOT}/include)
 include_directories(${MKL_INCLUDE_DIR})
 message(STATUS "System: ${CMAKE_SYSTEM_NAME}")
+
+option(ENABLE_MKL_MULTITHREADING "Enable GNU OpenMP multithreading for MKL" OFF) 
+
 find_library(MKL_ILP64 libmkl_intel_ilp64.so HINTS ${MKL_ROOT}/lib/intel64/ ${MKL_ROOT}/lib)
 find_library(MKL_SEQUENTIAL libmkl_sequential.so HINTS ${MKL_ROOT}/lib/intel64/ ${MKL_ROOT}/lib)
+find_library(MKL_GOMP libmkl_gnu_thread.so HINTS ${MKL_ROOT}/lib/intel64/ ${MKL_ROOT}/lib)
 find_library(MKL_CORE libmkl_core.so HINTS ${MKL_ROOT}/lib/intel64/ ${MKL_ROOT}/lib)
-set(MKL_LIBRARIES -Wl,--no-as-needed ${MKL_ILP64} ${MKL_SEQUENTIAL} ${MKL_CORE} -lpthread -lm -ldl)
+if (ENABLE_MKL_MULTITHREADING)
+  set(MKL_LIBRARIES -Wl,--no-as-needed ${MKL_ILP64} ${MKL_GOMP} ${MKL_CORE} -lgomp -lpthread -lm -ldl)
+else()
+  set(MKL_LIBRARIES -Wl,--no-as-needed ${MKL_ILP64} ${MKL_SEQUENTIAL} ${MKL_CORE} -lpthread -lm -ldl)
+endif(ENABLE_MKL_MULTITHREADING)
 add_definitions(-DMKL_ILP64)
 
 # this definition can be enabled for some debuggery purposes

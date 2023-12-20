@@ -8,11 +8,11 @@
 
 // enable this define to print some timing information about different
 // implementations
-#define DEANN_TESTS_DEBUG_PRINT_TIMES
+// #define DEANN_TESTS_DEBUG_PRINT_TIMES
 
 // these tests take a very long time and require a very large amount of RAM, so
 // they are disabled by default
-#define DEANN_TESTS_VERYBIG
+// #define DEANN_TESTS_VERYBIG
 
 using namespace deann;
 using namespace Catch::literals;
@@ -5757,7 +5757,7 @@ TEST_CASE( "test_fast_rng32", "[rng]" ) {
     }
 #endif // DEANN_TESTS_DEBUG_PRINT_TIMES
     
-#ifndef DEANN_TESTS_DEBUG_PRINT_TIMES
+#ifdef DEANN_TESTS_DEBUG_PRINT_TIMES
     vector<uint64_t> counts(m,0);
     for (uint64_t i = 0; i < niters; ++i) {
       uint32_t h = randints[i];
